@@ -13,7 +13,7 @@ import (
 // FromFilter 将 AIP Filter 转换为 clause.Where
 func FromFilter(filter filtering.Filter) (clause.Where, error) {
 	// 创建 Query 对象
-	wherer := query.NewWhereBuilder()
+	q := query.Table("")
 
 	// 解析表达式，处理空Filter情况
 	checkedExpr := filter.CheckedExpr
@@ -38,18 +38,18 @@ func FromFilter(filter filtering.Filter) (clause.Where, error) {
 
 			for _, e := range exprs {
 				if isOr {
-					wherer.OrWhere(e)
+					q.OrWhere(e)
 				} else {
-					wherer.Where(e)
+					q.Where(e)
 				}
-				if wherer.Error != nil {
-					return clause.Where{}, wherer.Error
+				if q.Error != nil {
+					return clause.Where{}, q.Error
 				}
 			}
 		}
 	}
 
-	return wherer.WhereExpr(), nil
+	return q.WhereExpr(), nil
 }
 
 // parseExpr 将 *exprpb.Expr 转换为 []clause.Expression

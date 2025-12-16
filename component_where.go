@@ -90,25 +90,19 @@ func (w *where[P]) Build(builder clause.Builder) {
 	w.Value.Build(builder)
 }
 
-func NewWhereBuilder() *WhereBuilder {
-	return &WhereBuilder{
-		where: clause.Where{},
-	}
-}
+var _ Wherer = (*whereBuilder)(nil)
 
-var _ Wherer = (*WhereBuilder)(nil)
-
-// WhereBuilder 实现 Wherer 接口
-type WhereBuilder struct {
+// whereBuilder 实现 Wherer 接口
+type whereBuilder struct {
 	where clause.Where
 	Error error
 }
 
-func (w *WhereBuilder) WhereExpr() clause.Where {
+func (w *whereBuilder) WhereExpr() clause.Where {
 	return w.where
 }
 
-func (w *WhereBuilder) Where(field any, args ...any) Wherer {
+func (w *whereBuilder) Where(field any, args ...any) Wherer {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
 		w.Error = err
@@ -118,7 +112,7 @@ func (w *WhereBuilder) Where(field any, args ...any) Wherer {
 	return w
 }
 
-func (w *WhereBuilder) OrWhere(field any, args ...any) Wherer {
+func (w *whereBuilder) OrWhere(field any, args ...any) Wherer {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
 		w.Error = err
@@ -130,7 +124,7 @@ func (w *WhereBuilder) OrWhere(field any, args ...any) Wherer {
 	return w
 }
 
-func (w *WhereBuilder) Not(field any, args ...any) Wherer {
+func (w *whereBuilder) Not(field any, args ...any) Wherer {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
 		w.Error = err
@@ -160,7 +154,7 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 	switch c := column.(type) {
 	case func(Wherer) Wherer:
 		// 创建whereBuilder实例
-		builder := NewWhereBuilder()
+		builder := &whereBuilder{where: clause.Where{}}
 		// 调用闭包函数
 		result := c(builder).WhereExpr().Exprs
 		// 用And包裹以添加括号

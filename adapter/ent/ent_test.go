@@ -11,12 +11,10 @@ import (
 // 测试基本的 Where 条件转换
 func TestWhereFunc(t *testing.T) {
 	// 创建查询条件
-	wherer := query.NewWhereBuilder()
-	wherer.Where("name", "John")
-	wherer.Where("age", ">", 18)
+	q := query.Table("").Where("name", "John").Where("age", ">", 18)
 
 	// 获取 Where 表达式
-	where := wherer.WhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -79,10 +77,9 @@ func TestPagination(t *testing.T) {
 // 测试完整的 Query 条件转换
 func TestQuery(t *testing.T) {
 	// 创建 Where 条件
-	wherer := query.NewWhereBuilder()
-	wherer.Where("name", "John")
-	wherer.Where("age", ">", 18)
-	where := wherer.WhereExpr()
+	q := query.Table("").Where("name", "John").
+		Where("age", ">", 18)
+	where := q.WhereExpr()
 
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
@@ -113,16 +110,15 @@ func TestQuery(t *testing.T) {
 // 测试 Or 条件转换
 func TestOrWhereFunc(t *testing.T) {
 	// 创建查询条件
-	wherer := query.NewWhereBuilder()
-	wherer.OrWhere(func(w query.Wherer) query.Wherer {
+	q := query.Table("").OrWhere(func(w query.Wherer) query.Wherer {
 		w.Where("name", "John")
 		w.Where("age", 30)
 		return w
 	})
-	wherer.OrWhere("city", "New York")
+	q.OrWhere("city", "New York")
 
 	// 获取 Where 表达式
-	where := wherer.WhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -141,12 +137,10 @@ func TestOrWhereFunc(t *testing.T) {
 // 测试 Not 条件转换
 func TestNotWhereFunc(t *testing.T) {
 	// 创建查询条件
-	wherer := query.NewWhereBuilder()
-	wherer.Not("name", "John")
-	wherer.Not("age", ">", 18)
+	q := query.Table("").Not("name", "John").Not("age", ">", 18)
 
 	// 获取 Where 表达式
-	where := wherer.WhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -165,8 +159,7 @@ func TestNotWhereFunc(t *testing.T) {
 // 测试 IN 条件转换
 func TestInWhereFunc(t *testing.T) {
 	// 创建查询条件
-	wherer := query.NewWhereBuilder()
-	wherer.Where("id", "IN", []interface{}{1, 2, 3})
+	wherer := query.Table("").Where("id", "IN", []any{1, 2, 3})
 
 	// 获取 Where 表达式
 	where := wherer.WhereExpr()
