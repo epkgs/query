@@ -156,9 +156,12 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 		// 创建whereBuilder实例
 		builder := &whereBuilder{where: clause.Where{}}
 		// 调用闭包函数
-		result := c(builder).WhereExpr().Exprs
+		exprs := c(builder).WhereExpr().Exprs
+		if len(exprs) == 0 {
+			return exprs, nil
+		}
 		// 用And包裹以添加括号
-		return []clause.Expression{clause.And(result...)}, nil
+		return []clause.Expression{clause.And(exprs...)}, nil
 	case clause.Where:
 		return c.Exprs, nil
 	case clause.AndExpr:
