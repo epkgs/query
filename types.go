@@ -16,13 +16,13 @@ type genericWherer[Self any] interface {
 	Not(field any, args ...any) Self
 }
 
-type Paginator[Self any] interface {
-	Pagination() Pagination
+type genericPaginator[Self any] interface {
+	PaginationExpr() clause.Pagination
 	Limit(limit int) Self
 	Offset(offset int) Self
 	Paginate(page int, pageSize int) Self
 }
 
-type Sorter[Self any] interface {
-	OrderBy(column string, direction ...string) Self
+type genericSorter[Self any] interface {
+	OrderBy(field any, args ...any) Self
 }

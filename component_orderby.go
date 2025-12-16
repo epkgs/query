@@ -6,6 +6,9 @@ import (
 	"github.com/epkgs/query/clause"
 )
 
+var _ genericSorter[*Query] = (*orderbys[*Query])(nil)
+var _ clause.Expression = (*orderbys[*Query])(nil)
+
 // orderbys 是一个通用的排序查询构建器，支持多种排序方式
 // P 父 struct，必须实现 errorRecorder 接口
 type orderbys[P errorRecorder] struct {

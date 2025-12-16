@@ -7,6 +7,9 @@ type Pagination struct {
 	Limit  int
 }
 
+var _ genericPaginator[*Query] = (*pagination[*Query])(nil)
+var _ clause.Expression = (*pagination[*Query])(nil)
+
 type pagination[P any] struct {
 	Parent P
 	Value  clause.Pagination

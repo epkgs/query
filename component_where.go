@@ -2,6 +2,9 @@ package query
 
 import "github.com/epkgs/query/clause"
 
+var _ genericWherer[*Query] = (*where[*Query])(nil)
+var _ clause.Expression = (*where[*Query])(nil)
+
 type where[P errorRecorder] struct {
 	Parent P
 	Value  clause.Where
