@@ -112,7 +112,7 @@ func testFilterConversion(t *testing.T, filterStr, expectedSQL string, expectedA
 	// 构建 SQL
 	w.Build(builder)
 
-	got := strings.TrimLeft(builder.String(), " WHERE ")
+	got := strings.TrimPrefix(builder.String(), " WHERE ")
 
 	// 验证生成的 SQL 是否包含预期的条件
 	// 注意：clause 包的运算符实现会在运算符前后添加空格，所以实际生成的 SQL 中会有 "=  $1" 这样的形式
