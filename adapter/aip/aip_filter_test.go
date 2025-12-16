@@ -51,9 +51,13 @@ func (m *mockBuilder) WriteQuoted(field interface{}) {
 
 // AddVar 添加参数到变量列表，实现 Builder 接口
 func (m *mockBuilder) AddVar(writer clause.Writer, vars ...interface{}) {
-	for _, v := range vars {
+	for i, v := range vars {
 		m.vars = append(m.vars, v)
-		m.sql += " $" + fmt.Sprintf("%d", len(m.vars))
+
+		if i > 0 {
+			m.sql += " "
+		}
+		m.sql += "$" + fmt.Sprintf("%d", len(m.vars))
 	}
 }
 
@@ -115,7 +119,6 @@ func testFilterConversion(t *testing.T, filterStr, expectedSQL string, expectedA
 	got := strings.TrimPrefix(builder.String(), " WHERE ")
 
 	// 验证生成的 SQL 是否包含预期的条件
-	// 注意：clause 包的运算符实现会在运算符前后添加空格，所以实际生成的 SQL 中会有 "=  $1" 这样的形式
 	if got != expectedSQL {
 		t.Errorf("Expected SQL: %s, got: %s", expectedSQL, got)
 	}
@@ -129,54 +132,87 @@ func testFilterConversion(t *testing.T, filterStr, expectedSQL string, expectedA
 // TestFromFilter_Integration 测试完整的集成功能
 func TestFromFilter_Integration(t *testing.T) {
 	testFilterConversion(t, "name = 'John' AND age > 18",
-		"`name` =  $1 AND `age` >  $2", 2)
+		"`name` = $1 AND `age` > $2", 2)
 }
 
 // TestFromFilter_ORCondition 测试 OR 条件
 func TestFromFilter_ORCondition(t *testing.T) {
-	testFilterConversion(t, "name = 'John' OR name = 'Jane'",
-		"`name` =  $1 OR `name` =  $2", 2)
+	testFilterConversion(
+		t,
+		"name = 'John' OR name = 'Jane'",
+		"`name` = $1 OR `name` = $2",
+		2,
+	)
 }
 
 // TestFromFilter_NotCondition 测试 NOT 条件
 func TestFromFilter_NotCondition(t *testing.T) {
-	testFilterConversion(t, "NOT age < 18",
-		"`age` >=  $1", 1)
+	testFilterConversion(
+		t,
+		"NOT age < 18",
+		"`age` >= $1",
+		1,
+	)
 }
 
 // TestFromFilter_CombinedCondition 测试组合条件
 func TestFromFilter_CombinedCondition(t *testing.T) {
-	testFilterConversion(t, "(name = 'John' OR name = 'Jane') AND age > 18",
-		"(`name` =  $1 OR `name` =  $2) AND `age` >  $3", 3)
+	testFilterConversion(
+		t,
+		"(name = 'John' OR name = 'Jane') AND age > 18",
+		"(`name` = $1 OR `name` = $2) AND `age` > $3",
+		3,
+	)
 }
 
 // TestFromFilter_ComparisonOperators 测试比较运算符
 func TestFromFilter_ComparisonOperators(t *testing.T) {
-	testFilterConversion(t, "age >= 18 AND age <= 30",
-		"`age` >=  $1 AND `age` <=  $2", 2)
+	testFilterConversion(
+		t,
+		"age >= 18 AND age <= 30",
+		"`age` >= $1 AND `age` <= $2",
+		2,
+	)
 }
 
 // TestFromFilter_MultiFieldCondition 测试多字段条件
 func TestFromFilter_MultiFieldCondition(t *testing.T) {
-	testFilterConversion(t, "name = 'John' AND age > 18 AND status = 'active'",
-		"(`name` =  $1 AND `age` >  $2) AND `status` =  $3", 3)
+	testFilterConversion(
+		t,
+		"name = 'John' AND age > 18 AND status = 'active'",
+		"(`name` = $1 AND `age` > $2) AND `status` = $3",
+		3,
+	)
 }
 
 // TestFromFilter_EmptyFilter 测试空Filter
 func TestFromFilter_EmptyFilter(t *testing.T) {
-	testFilterConversion(t, "", "", 0)
+	testFilterConversion(
+		t,
+		"",
+		"",
+		0,
+	)
 }
 
 // TestFromFilter_INCondition 测试 IN 条件
 // 注意：AIP Filter 可能不支持直接的 IN 语法，使用 OR 条件替代
 func TestFromFilter_INCondition(t *testing.T) {
-	testFilterConversion(t, "name = 'John' OR name = 'Jane' OR name = 'Bob'",
-		"(`name` =  $1 OR `name` =  $2) OR `name` =  $3", 3)
+	testFilterConversion(
+		t,
+		"name = 'John' OR name = 'Jane' OR name = 'Bob'",
+		"(`name` = $1 OR `name` = $2) OR `name` = $3",
+		3,
+	)
 }
 
 // TestFromFilter_ComplexNestedCondition 测试复杂嵌套条件
 // 使用类型兼容的条件，避免 OR 函数的类型不匹配问题
 func TestFromFilter_ComplexNestedCondition(t *testing.T) {
-	testFilterConversion(t, "(name = 'John' AND (age > 18 OR age < 30)) OR (name = 'Jane' AND age < 30)",
-		"(`name` =  $1 AND (`age` >  $2 OR `age` <  $3)) OR (`name` =  $4 AND `age` <  $5)", 5)
+	testFilterConversion(
+		t,
+		"(name = 'John' AND (age > 18 OR age < 30)) OR (name = 'Jane' AND age < 30)",
+		"(`name` = $1 AND (`age` > $2 OR `age` < $3)) OR (`name` = $4 AND `age` < $5)",
+		5,
+	)
 }
