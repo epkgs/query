@@ -1,4 +1,4 @@
-module gorm-example
+module aip-to-gorm-example
 
 go 1.23.0
 

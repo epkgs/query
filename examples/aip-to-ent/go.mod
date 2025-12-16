@@ -1,4 +1,4 @@
-module ent-example
+module aip-to-ent-example
 
 go 1.23.0
 
