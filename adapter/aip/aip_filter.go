@@ -10,7 +10,7 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
-// FromFilter 将 AIP Filter 转换为 SelectQuery
+// FromFilter 将 AIP Filter 转换为 clause.Where
 func FromFilter(filter filtering.Filter) (clause.Where, error) {
 	// 创建 Query 对象
 	wherer := query.NewWhereBuilder()
