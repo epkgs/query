@@ -61,7 +61,12 @@ func parseExpr(exp *exprpb.Expr) ([]clause.Expression, error) {
 	switch kind := exp.ExprKind.(type) {
 	case *exprpb.Expr_CallExpr:
 		return parseCallExpr(kind.CallExpr)
+	case *exprpb.Expr_IdentExpr:
+		// 处理标识符表达式（字段名）
+		fieldName := kind.IdentExpr.Name
+		return []clause.Expression{clause.Eq{Column: fieldName, Value: true}}, nil
 	default:
+		// TODO: 支持更多类型
 		return nil, fmt.Errorf("unsupported expression type: %T", kind)
 	}
 }
