@@ -3,7 +3,7 @@ module github.com/epkgs/query/adapter/gorm
 go 1.18.0
 
 require (
-	github.com/epkgs/query v0.0.0
+	github.com/epkgs/query v0.0.0-00010101000000-000000000000
 	gorm.io/gorm v1.31.1
 )
 
