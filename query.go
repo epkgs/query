@@ -13,7 +13,7 @@ var (
 	ErrInvalidOrderBy      = errors.New("invalid order by")
 )
 
-var _ Clauser[*Query] = (*Query)(nil)
+var _ genericWherer[*Query] = (*Query)(nil)
 
 // Query 基础查询结构体
 type Query struct {

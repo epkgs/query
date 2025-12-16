@@ -5,7 +5,7 @@ GO_MOD_CACHE_DIR := ./.gocache
 ALL_GO_MOD_DIRS := $(shell find . -type f -name 'go.mod' -exec dirname {} \; | grep -v $(GO_MOD_CACHE_DIR) | sort | uniq) # find all go.mod files
 ROOT_GO_MOD_DIRS := $(filter-out $(TOOLS_MOD_DIR) $(PROTO_GEN_DIR) $(GO_MOD_CACHE_DIR), $(ALL_GO_MOD_DIRS)) # filter out tools directory
 ALL_WIRE_DIRS := $(shell find . -type f -name 'wire.go' -exec dirname {} \; | sort | uniq) # find all wire.go files
-ALL_PROJECT_DIRS := $(shell find ./app -maxdepth 1 -mindepth 1 -type d | sort | uniq) # find all project directories
+# ALL_PROJECT_DIRS := $(shell find ./app -maxdepth 1 -mindepth 1 -type d | sort | uniq) # find all project directories
 ALL_BUF_DIRS := $(shell find . -type f -name 'buf.yaml' -exec dirname {} \; | grep -v $(GO_MOD_CACHE_DIR) | sort | uniq) # find all buf.yaml files
 ALL_AIR_DIRS := $(shell find . -type f -name '.air.toml' -exec dirname {} \; | sort | uniq) # find all air.toml files
 
@@ -92,7 +92,7 @@ print-env:
 	@echo " Bin Dir:       $(BIN_DIR)"
 	@echo " Tmp Dir:       $(TMP_DIR)"
 	@echo " Go Modules:    $(ALL_GO_MOD_DIRS)"
-	@echo " Projects:      $(ALL_PROJECT_DIRS)"
+# 	@echo " Projects:      $(ALL_PROJECT_DIRS)"
 	@echo " Buf Dirs:      $(ALL_BUF_DIRS)"
 	@echo " Air Dirs:      $(ALL_AIR_DIRS)"
 	@echo "=================================="

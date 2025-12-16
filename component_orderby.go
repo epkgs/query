@@ -7,8 +7,11 @@ import (
 )
 
 // orderbys 是一个通用的排序查询构建器，支持多种排序方式
-// P 是错误记录器类型，必须实现 errorRecorder 接口
-type orderbys[P errorRecorder] chained[P, clause.OrderBys]
+// P 父 struct，必须实现 errorRecorder 接口
+type orderbys[P errorRecorder] struct {
+	Parent P
+	Value  clause.OrderBys
+}
 
 // OrderByExpr 返回当前的排序表达式
 func (o *orderbys[P]) OrderByExpr() clause.OrderBys {

@@ -2,13 +2,6 @@ package query
 
 import "github.com/epkgs/query/clause"
 
-type Wherer interface {
-	WhereExpr() clause.Where
-	Where(field any, args ...any) Wherer
-	OrWhere(field any, args ...any) Wherer
-	Not(field any, args ...any) Wherer
-}
-
 type where[P errorRecorder] struct {
 	Parent P
 	Value  clause.Where

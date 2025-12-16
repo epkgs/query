@@ -1,23 +1,28 @@
 package query
 
-type chained[P any, V any] struct {
-	Parent P
-	Value  V
+import "github.com/epkgs/query/clause"
+
+type Wherer interface {
+	WhereExpr() clause.Where
+	Where(field any, args ...any) Wherer
+	OrWhere(field any, args ...any) Wherer
+	Not(field any, args ...any) Wherer
 }
 
-type Clauser[P any] interface {
-	Where(field any, args ...any) P
-	OrWhere(field any, args ...any) P
-	Not(field any, args ...any) P
+type genericWherer[Self any] interface {
+	WhereExpr() clause.Where
+	Where(field any, args ...any) Self
+	OrWhere(field any, args ...any) Self
+	Not(field any, args ...any) Self
 }
 
-type Paginater[P any] interface {
+type Paginator[Self any] interface {
 	Pagination() Pagination
-	Limit(limit int) P
-	Offset(offset int) P
-	Paginate(page int, pageSize int) P
+	Limit(limit int) Self
+	Offset(offset int) Self
+	Paginate(page int, pageSize int) Self
 }
 
-type Orderer[P any] interface {
-	OrderBy(column string, direction ...string) P
+type Sorter[Self any] interface {
+	OrderBy(column string, direction ...string) Self
 }
