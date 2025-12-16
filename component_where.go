@@ -23,10 +23,10 @@ func (p *where[P]) WhereExpr() clause.Where {
 //   - 当前实例，支持链式调用
 //
 // 示例:
-//   - q.Where("name", "John")             // name = John
-//   - q.Where("age", ">", 18)              // age > 18
-//   - q.Where(clause.Eq{Column: "name", Value: "John"})  // 使用clause.Expression
-//   - q.Where(func(w Wherer) Wherer {  w.Where("name", "John"); return w }) // Closure
+//   - q.Where("name", "John")
+//   - q.Where("age", ">", 18)
+//   - q.Where(clause.Eq{Column: "name", Value: "John"})
+//   - q.Where(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
 func (p *where[P]) Where(field any, args ...any) P {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
@@ -46,10 +46,10 @@ func (p *where[P]) Where(field any, args ...any) P {
 //   - 当前实例，支持链式调用
 //
 // 示例:
-//   - q.OrWhere("name", "John")             // OR name = John
-//   - q.OrWhere("age", ">", 18)              // OR age > 18
-//   - q.OrWhere(clause.Eq{Column: "name", Value: "John"})  // 使用clause.Expression
-//   - q.OrWhere(func(w Wherer) Wherer {  w.Where("name", "John"); return w }) // Closure
+//   - q.OrWhere("name", "John")
+//   - q.OrWhere("age", ">", 18)
+//   - q.OrWhere(clause.Eq{Column: "name", Value: "John"})
+//   - q.OrWhere(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
 func (p *where[P]) OrWhere(field any, args ...any) P {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
@@ -71,10 +71,10 @@ func (p *where[P]) OrWhere(field any, args ...any) P {
 //   - 当前实例，支持链式调用
 //
 // 示例:
-//   - q.Not("name", "John")             // NOT name = John
-//   - q.Not("age", ">", 18)              // NOT age > 18
-//   - q.Not(clause.Eq{Column: "name", Value: "John"})  // 使用clause.Expression
-//   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w }) // Closure
+//   - q.Not("name", "John")
+//   - q.Not("age", ">", 18)
+//   - q.Not(clause.Eq{Column: "name", Value: "John"})
+//   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
 func (p *where[P]) Not(field any, args ...any) P {
 	expressions, err := buildCondition(field, args...)
 	if err != nil {
