@@ -15,9 +15,13 @@ func Where(where clause.Where) func(s *sql.Selector) {
 		}
 
 		// 将 query/clause.Where 转换为 ent 的条件
-		if pred, err := convertToEntWhere(where); err != nil {
+		pred, err := convertToEntWhere(where)
+		if err != nil {
 			s.Builder.AddError(err)
-		} else {
+			return
+		}
+
+		if pred != nil {
 			s.Where(pred)
 		}
 	}
