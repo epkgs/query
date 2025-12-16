@@ -11,7 +11,7 @@ import (
 // 测试基本的 Where 条件转换
 func TestWhereScope(t *testing.T) {
 	// 创建查询条件
-	q := query.Table("").Where("name", "John").Where("age", ">", 18)
+	q := query.Where("name", "John").Where("age", ">", 18)
 
 	// 获取 Where 表达式
 	where := q.WhereExpr()
@@ -74,7 +74,7 @@ func TestPaginationScope(t *testing.T) {
 // 测试完整的 Query 条件转换
 func TestQueryScope(t *testing.T) {
 	// 创建 Where 条件
-	q := query.Table("").Where("name", "John").Where("age", ">", 18)
+	q := query.Where("name", "John").Where("age", ">", 18)
 	where := q.WhereExpr()
 
 	// 创建 OrderBy 条件
@@ -152,7 +152,7 @@ func TestNotWhereScope(t *testing.T) {
 // 测试 IN 条件转换
 func TestInWhereScope(t *testing.T) {
 	// 创建查询条件
-	q := query.Table("").Where("id", "IN", []interface{}{1, 2, 3})
+	q := query.Where("id", "IN", []interface{}{1, 2, 3})
 
 	// 获取 Where 表达式
 	where := q.WhereExpr()

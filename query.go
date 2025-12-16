@@ -53,6 +53,89 @@ func Table(tableName string) *Query {
 	return newQuery(tableName)
 }
 
+// Where 添加WHERE条件到当前查询
+// 参数:
+//   - field: 字段名、表达式或表达式数组
+//   - args: 条件参数，格式根据field类型而定
+//
+// 返回值:
+//   - 当前实例，支持链式调用
+//
+// 示例:
+//   - q.Where("name", "John")
+//   - q.Where("age", ">", 18)
+//   - q.Where(clause.Eq{Column: "name", Value: "John"})
+//   - q.Where(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
+func Where(field any, args ...any) *Query {
+	return newQuery("").Where(field, args...)
+}
+
+// OrWhere 添加OR WHERE条件到当前查询
+// 参数:
+//   - field: 字段名、表达式或表达式数组
+//   - args: 条件参数，格式根据field类型而定
+//
+// 返回值:
+//   - 当前实例，支持链式调用
+//
+// 示例:
+//   - q.OrWhere("name", "John")
+//   - q.OrWhere("age", ">", 18)
+//   - q.OrWhere(clause.Eq{Column: "name", Value: "John"})
+//   - q.OrWhere(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
+func OrWhere(field any, args ...any) *Query {
+	return newQuery("").OrWhere(field, args...)
+}
+
+// Not 添加NOT条件到当前查询
+// 参数:
+//   - field: 字段名、表达式或表达式数组
+//   - args: 条件参数，格式根据field类型而定
+//
+// 返回值:
+//   - 当前实例，支持链式调用
+//
+// 示例:
+//   - q.Not("name", "John")
+//   - q.Not("age", ">", 18)
+//   - q.Not(clause.Eq{Column: "name", Value: "John"})
+//   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
+func Not(field any, args ...any) *Query {
+	return newQuery("").Not(field, args...)
+}
+
+// OrderBy 添加ORDER BY子句到当前查询
+// 参数:
+//   - field: 字段名、表达式或表达式数组
+//   - args: 排序参数，格式根据field类型而定
+//
+// 返回值:
+//   - 当前实例，支持链式调用
+//
+// 示例:
+//   - q.OrderBy("age")
+//   - q.OrderBy("age", "desc")
+//   - q.OrderBy(clause.OrderBy{Column: "age", Direction: clause.Desc})
+//   - q.OrderBy(func(o OrderByser) OrderByser {  o.OrderBy("age"); return o })
+func OrderBy(field any, args ...any) *Query {
+	return newQuery("").OrderBy(field, args...)
+}
+
+// Limit 设置查询的限制条数
+func Limit(limit int) *Query {
+	return newQuery("").Limit(limit)
+}
+
+// Offset 设置查询的偏移量
+func Offset(offset int) *Query {
+	return newQuery("").Offset(offset)
+}
+
+// Paginate 设置分页参数
+func Paginate(page, pageSize int) *Query {
+	return newQuery("").Paginate(page, pageSize)
+}
+
 // Table 设置查询的表名
 func (q *Query) Table(tableName string) *Query {
 	q.table = tableName
