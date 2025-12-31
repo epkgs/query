@@ -8,33 +8,32 @@ import (
 )
 
 type options struct {
-	mapper MapperFunc
+	exprHandler  ExprHandler
+	orderHandler OrderHandler
 }
 
 type Option func(*options)
 
-// MapperFunc 定义了查询列名到 ENT 列名的映射函数类型
-// 输入参数 queryColumn 是查询条件中使用的列名
-// 返回值 entColumn 是数据库表中的实际列名
-type MapperFunc func(queryColumn string) (entColumn string)
+// ExprHandler 表达式处理器函数类型，用于在转换为 ENT Selector 前预处理clause.Expression
+// expr: 原始的查询表达式
+// 返回值: 预处理后的查询表达式
+type ExprHandler func(expr clause.Expression) clause.Expression
 
-// WithMapper 创建一个配置选项，用于设置查询列名到数据库实际列名的映射函数
-// mapper 参数是一个 MapperFunc 类型的函数，用于自定义列名映射逻辑
-// 该选项用于在将查询条件转换为 ENT 条件时，通过自定义函数实现灵活的列名映射
-// 例如：可以实现驼峰命名转下划线命名、添加前缀/后缀等复杂映射逻辑
-func WithMapper(mapper MapperFunc) Option {
-	// 返回一个 Option 函数类型，该函数接收一个 options 指针并修改其 mapper 字段
+func WithExprHandler(handler ExprHandler) Option {
 	return func(o *options) {
-		o.mapper = mapper
+		o.exprHandler = handler
 	}
 }
 
-func (o *options) Column(column string) string {
-	if o.mapper != nil {
-		return o.mapper(column)
-	}
+// OrderHandler 排序处理器函数类型，用于在转换为 ENT Selector 前预处理clause.OrderBy
+// expr: 原始的排序表达式
+// 返回值: 预处理后的排序表达式
+type OrderHandler func(expr clause.OrderBy) clause.OrderBy
 
-	return column
+func WithOrderByHandler(handler OrderHandler) Option {
+	return func(o *options) {
+		o.orderHandler = handler
+	}
 }
 
 // Where 将 clause.Where 转换为 ent 的 Where 函数
@@ -69,115 +68,119 @@ func convertToEntWhere(where clause.Where, opt *options) (*sql.Predicate, error)
 		return nil, nil
 	}
 
-	var preds []*sql.Predicate
+	var err error
+	var pred *sql.Predicate
 	for _, expr := range where.Exprs {
-		pred, err := convertToEntPredicate(expr, opt)
+		pred, err = convertToEntPredicate(pred, expr, opt)
 		if err != nil {
 			return nil, err
 		}
-		if pred != nil {
-			preds = append(preds, pred)
-		}
 	}
 
-	if len(preds) == 1 {
-		return preds[0], nil
-	} else if len(preds) > 1 {
-		return sql.And(preds...), nil
-	}
+	return pred, nil
+}
 
-	return nil, nil
+func sqlAnd(pred1, pred2 *sql.Predicate) *sql.Predicate {
+	if pred1 != nil {
+		return sql.And(pred1, pred2)
+	} else {
+		return pred2
+	}
+}
+
+func sqlOr(pred1, pred2 *sql.Predicate) *sql.Predicate {
+	if pred1 != nil {
+		return sql.Or(pred1, pred2)
+	} else {
+		return pred2
+	}
 }
 
 // convertToEntPredicate 将 query/clause.Expression 转换为 *sql.Predicate
-func convertToEntPredicate(expr clause.Expression, opt *options) (*sql.Predicate, error) {
+func convertToEntPredicate(pre *sql.Predicate, expr clause.Expression, opt *options) (*sql.Predicate, error) {
+
+	if opt.exprHandler != nil {
+		expr = opt.exprHandler(expr) // 调用转换器
+	}
+
+	if expr == nil {
+		return pre, nil
+	}
+
 	switch e := expr.(type) {
 	case clause.Eq:
-		return sql.EQ(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.EQ(e.Column, e.Value)), nil
 	case clause.Neq:
-		return sql.NEQ(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.NEQ(e.Column, e.Value)), nil
 	case clause.Gt:
-		return sql.GT(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.GT(e.Column, e.Value)), nil
 	case clause.Gte:
-		return sql.GTE(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.GTE(e.Column, e.Value)), nil
 	case clause.Lt:
-		return sql.LT(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.LT(e.Column, e.Value)), nil
 	case clause.Lte:
-		return sql.LTE(opt.Column(e.Column), e.Value), nil
+		return sqlAnd(pre, sql.LTE(e.Column, e.Value)), nil
 	case clause.Like:
 		// 将 interface{} 转换为 string
 		if likeValue, ok := e.Value.(string); ok {
-			return sql.Like(opt.Column(e.Column), likeValue), nil
+			return sqlAnd(pre, sql.Like(e.Column, likeValue)), nil
 		}
 		return nil, errors.New("like value must be string")
 	case clause.IN:
-		return sql.In(opt.Column(e.Column), e.Values...), nil
+		return sqlAnd(pre, sql.In(e.Column, e.Values...)), nil
 	case clause.AndExpr:
 		// 对于 AND 表达式，递归处理所有子表达式
 		if len(e.Exprs) == 0 {
-			return nil, nil
+			return pre, nil
 		}
-		// 初始化 AND 条件切片
-		var andPreds []*sql.Predicate
+		// 初始化 AND 条件
+		var subPred *sql.Predicate
+		var err error
 		for _, subExpr := range e.Exprs {
-			pred, err := convertToEntPredicate(subExpr, opt)
+			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
 			if err != nil {
 				return nil, err
 			}
-			if pred != nil {
-				andPreds = append(andPreds, pred)
-			}
 		}
-		// 如果只有一个条件，直接返回
-		if len(andPreds) == 1 {
-			return andPreds[0], nil
+
+		if pre != nil {
+			return sql.And(pre, subPred), nil
 		}
-		// 否则返回 AND 连接的条件
-		return sql.And(andPreds...), nil
+		return subPred, nil
 	case clause.OrExpr:
 		// 对于 OR 表达式，递归处理所有子表达式
 		if len(e.Exprs) == 0 {
 			return nil, nil
 		}
-		// 初始化 OR 条件切片
-		var orPreds []*sql.Predicate
+		// 初始化 OR 条件
+		var subPred *sql.Predicate
+		var err error
 		for _, subExpr := range e.Exprs {
-			pred, err := convertToEntPredicate(subExpr, opt)
+			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
 			if err != nil {
 				return nil, err
 			}
-			if pred != nil {
-				orPreds = append(orPreds, pred)
-			}
 		}
-		// 如果只有一个条件，直接返回
-		if len(orPreds) == 1 {
-			return orPreds[0], nil
-		}
-		// 否则返回 OR 连接的条件
-		return sql.Or(orPreds...), nil
+
+		return sqlOr(pre, subPred), nil
+
 	case clause.NotExpr:
 		// 对于 NOT 表达式，递归处理所有子表达式
 		if len(e.Exprs) == 0 {
 			return nil, nil
 		}
-		// 初始化 NOT 条件切片
-		var notPreds []*sql.Predicate
+
+		// 初始化 NOT 条件
+		var subPred *sql.Predicate
+		var err error
 		for _, subExpr := range e.Exprs {
-			pred, err := convertToEntPredicate(subExpr, opt)
+			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
 			if err != nil {
 				return nil, err
 			}
-			if pred != nil {
-				notPreds = append(notPreds, pred)
-			}
 		}
-		// 如果只有一个条件，直接返回 NOT 条件
-		if len(notPreds) == 1 {
-			return sql.Not(notPreds[0]), nil
-		}
-		// 否则返回 NOT AND 连接的条件
-		return sql.Not(sql.And(notPreds...)), nil
+
+		return sqlAnd(pre, sql.Not(subPred)), nil
 	default:
 		return nil, nil
 	}
@@ -196,10 +199,19 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector) {
 		}
 
 		for _, order := range orders {
+
+			if opt.orderHandler != nil {
+				order = opt.orderHandler(order) // 调用转换器
+			}
+
+			if order.Column == "" {
+				continue
+			}
+
 			if order.Desc {
-				s.OrderBy(sql.Desc(opt.Column(order.Column)))
+				s.OrderBy(sql.Desc(order.Column))
 			} else {
-				s.OrderBy(sql.Asc(opt.Column(order.Column)))
+				s.OrderBy(sql.Asc(order.Column))
 			}
 		}
 	}

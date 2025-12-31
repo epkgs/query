@@ -7,33 +7,32 @@ import (
 )
 
 type options struct {
-	mapper MapperFunc
+	exprHandler  ExprHandler
+	orderHandler OrderHandler
 }
 
 type Option func(*options)
 
-// MapperFunc 定义了查询列名到 GORM 列名的映射函数类型
-// 输入参数 queryColumn 是查询条件中使用的列名
-// 返回值 gormColumn 是数据库表中的实际列名
-type MapperFunc func(queryColumn string) (gormColumn string)
+// ExprHandler 表达式处理器函数类型，用于在转换为GORM表达式前预处理clause.Expression
+// expr: 原始的查询表达式
+// 返回值: 预处理后的查询表达式
+type ExprHandler func(expr clause.Expression) clause.Expression
 
-// WithMapper 创建一个配置选项，用于设置查询列名到数据库实际列名的映射函数
-// mapper 参数是一个 MapperFunc 类型的函数，用于自定义列名映射逻辑
-// 该选项用于在将查询条件转换为 GORM 条件时，通过自定义函数实现灵活的列名映射
-// 例如：可以实现驼峰命名转下划线命名、添加前缀/后缀等复杂映射逻辑
-func WithMapper(mapper MapperFunc) Option {
-	// 返回一个 Option 函数类型，该函数接收一个 options 指针并修改其 mapper 字段
+func WithExprHandler(handler ExprHandler) Option {
 	return func(o *options) {
-		o.mapper = mapper
+		o.exprHandler = handler
 	}
 }
 
-func (o *options) Column(column string) string {
-	if o.mapper != nil {
-		return o.mapper(column)
-	}
+// OrderHandler 排序处理器函数类型，用于在转换为GORM排序表达式前预处理clause.OrderBy
+// expr: 原始的排序表达式
+// 返回值: 预处理后的排序表达式
+type OrderHandler func(expr clause.OrderBy) clause.OrderBy
 
-	return column
+func WithOrderByHandler(handler OrderHandler) Option {
+	return func(o *options) {
+		o.orderHandler = handler
+	}
 }
 
 // Where 将 clause.Where 转换为 gorm scope
@@ -59,7 +58,7 @@ func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB {
 
 // convertWhere 将 query/clause.Where 转换为 gorm/clause.Where
 func convertWhere(where clause.Where, opt *options) gormClause.Where {
-	var gormExprs []gormClause.Expression
+	gormExprs := make([]gormClause.Expression, 0, len(where.Exprs))
 
 	for _, expr := range where.Exprs {
 		gormExpr := convertExpr(expr, opt)
@@ -73,23 +72,32 @@ func convertWhere(where clause.Where, opt *options) gormClause.Where {
 
 // convertExpr 将 query/clause.Expression 转换为 gorm/clause.Expression
 func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
+
+	if opt.exprHandler != nil {
+		expr = opt.exprHandler(expr) // 调用转换器
+	}
+
+	if expr == nil {
+		return nil
+	}
+
 	switch e := expr.(type) {
 	case clause.Eq:
-		return gormClause.Eq{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Eq{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Neq:
-		return gormClause.Neq{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Neq{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Gt:
-		return gormClause.Gt{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Gt{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Gte:
-		return gormClause.Gte{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Gte{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Lt:
-		return gormClause.Lt{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Lt{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Lte:
-		return gormClause.Lte{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Lte{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.Like:
-		return gormClause.Like{Column: gormClause.Column{Name: opt.Column(e.Column)}, Value: e.Value}
+		return gormClause.Like{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
 	case clause.IN:
-		return gormClause.IN{Column: gormClause.Column{Name: opt.Column(e.Column)}, Values: e.Values}
+		return gormClause.IN{Column: gormClause.Column{Name: e.Column}, Values: e.Values}
 	case clause.AndExpr:
 		var gormExprs []gormClause.Expression
 		for _, subExpr := range e.Exprs {
@@ -146,8 +154,15 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB 
 		gOrderByCols := []gormClause.OrderByColumn{}
 
 		for _, order := range orders {
+			if opt.orderHandler != nil {
+				order = opt.orderHandler(order) // 调用转换器
+			}
+
+			if order.Column == "" {
+				continue
+			}
 			gOrderByCols = append(gOrderByCols, gormClause.OrderByColumn{
-				Column: gormClause.Column{Name: opt.Column(order.Column)},
+				Column: gormClause.Column{Name: order.Column},
 				Desc:   order.Desc,
 			})
 		}
