@@ -1,6 +1,10 @@
 package query
 
-import "github.com/epkgs/query/clause"
+import (
+	"reflect"
+
+	"github.com/epkgs/query/clause"
+)
 
 var _ genericWherer[*Query] = (*where[*Query])(nil)
 var _ clause.Expression = (*where[*Query])(nil)
@@ -214,10 +218,10 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 			return []clause.Expression{clause.Lt{Column: c, Value: args[1]}}, nil
 		case "<=":
 			return []clause.Expression{clause.Lte{Column: c, Value: args[1]}}, nil
-		case "LIKE":
+		case "LIKE", "like":
 			return []clause.Expression{clause.Like{Column: c, Value: args[1]}}, nil
-		case "IN":
-			return []clause.Expression{clause.IN{Column: c, Values: args[1].([]interface{})}}, nil
+		case "IN", "in":
+			return []clause.Expression{clause.IN{Column: c, Values: toAnySlice(args[1])}}, nil
 		default:
 			// 不支持的操作符
 			return nil, ErrInvalidOperator
@@ -227,4 +231,24 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 
 	// 无法识别的column类型
 	return nil, ErrInvalidCondition
+}
+
+func toAnySlice(value any) []any {
+
+	if value == nil {
+		return nil
+	}
+
+	v := reflect.ValueOf(value)
+
+	switch v.Kind() {
+	case reflect.Array, reflect.Slice:
+		result := make([]any, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			result[i] = v.Index(i).Interface()
+		}
+		return result
+	default:
+		return []any{value}
+	}
 }
