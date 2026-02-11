@@ -51,6 +51,10 @@ func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB {
 		// 将 query/clause.Where 转换为 gorm/clause.Where
 		gormWhere := convertWhere(where, opt)
 
+		if len(gormWhere.Exprs) == 0 {
+			return db
+		}
+
 		// 将 gorm/clause.Where 给到 gorm.DB 的 Where 函数
 		return db.Where(gormWhere)
 	}
