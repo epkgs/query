@@ -171,7 +171,9 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB 
 			})
 		}
 
-		db.Order(gormClause.OrderBy{Columns: gOrderByCols})
+		if len(gOrderByCols) > 0 {
+			db.Order(gormClause.OrderBy{Columns: gOrderByCols})
+		}
 
 		return db
 	}
