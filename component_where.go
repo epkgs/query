@@ -442,8 +442,17 @@ func (w *where[Q]) Like(column string, value any) Q {
 }
 
 // In 添加 IN 条件
+// 支持传入展开值或切片/数组，内部会自动转换为 IN 条件
+//
+// 示例：
+//   - In("city", "London", "Paris", "Berlin")
+//   - In("id", []int{1, 2, 3})
 func (w *where[Q]) In(column string, values ...any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: values}}})
+	if len(values) == 1 {
+		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: toAnySlice(values[0])}}})
+	} else if len(values) > 1 {
+		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: values}}})
+	}
 	return w.Parent
 }
 
@@ -501,7 +510,12 @@ func Like(column string, value any) *Query {
 	return newQuery("").Like(column, value)
 }
 
-// In 创建 IN 条件
+// In 添加 IN 条件
+// 支持传入展开值或切片/数组，内部会自动转换为 IN 条件
+//
+// 示例：
+//   - In("city", "London", "Paris", "Berlin")
+//   - In("id", []int{1, 2, 3})
 func In(column string, values ...any) *Query {
 	return newQuery("").In(column, values...)
 }
