@@ -6,18 +6,34 @@ import (
 	"github.com/epkgs/query/clause"
 )
 
+type genericSorter[Q any] interface {
+	Asc(column string) Q
+	Desc(column string) Q
+	OrderBy(field any, orders ...any) Q
+	OrderByExpr() clause.OrderBys
+}
+
 var _ genericSorter[*Query] = (*orderbys[*Query])(nil)
 var _ clause.Expression = (*orderbys[*Query])(nil)
 
+type orderbyExprExporter interface {
+	OrderByExpr() clause.OrderBys
+}
+
+type orderbyQuerier interface {
+	errorRecorder
+	orderbyExprExporter
+}
+
 // orderbys 是一个通用的排序查询构建器，支持多种排序方式
-// P 父 struct，必须实现 errorRecorder 接口
-type orderbys[P errorRecorder] struct {
-	Parent P
+// Q 是一个实现了 orderbyQuerier 接口的查询类型，通常是 *Query
+type orderbys[Q orderbyQuerier] struct {
+	Parent Q
 	Value  clause.OrderBys
 }
 
 // OrderByExpr 返回当前的排序表达式
-func (o *orderbys[P]) OrderByExpr() clause.OrderBys {
+func (o *orderbys[Q]) OrderByExpr() clause.OrderBys {
 	return o.Value
 }
 
@@ -34,7 +50,7 @@ func (o *orderbys[P]) OrderByExpr() clause.OrderBys {
 //   - q.OrderBy("age asc")                  // age ASC
 //   - q.OrderBy(clause.OrderBy{Column: "name", Desc: true})  // 使用clause.Expression
 //   - q.OrderBy([]clause.OrderBy{ {Column: "name", Desc: true}, {Column: "age", Desc: false} }) // 多个排序子句
-func (o *orderbys[P]) OrderBy(field any, orders ...any) P {
+func (o *orderbys[Q]) OrderBy(field any, orders ...any) Q {
 
 	switch f := field.(type) {
 
@@ -76,7 +92,7 @@ func (o *orderbys[P]) OrderBy(field any, orders ...any) P {
 }
 
 // Build 构建排序子句
-func (o *orderbys[P]) Build(builder clause.Builder) {
+func (o *orderbys[Q]) Build(builder clause.Builder) {
 	o.Value.Build(builder)
 }
 
@@ -128,4 +144,29 @@ func buildOrderBy(column string, direction ...string) clause.OrderBys {
 			Desc:   strings.ToLower(direction[0]) == "desc",
 		},
 	}
+}
+
+// ========== 流畅链式 API (Fluent Chain API) ==========
+// 类似 GORM 的链式调用方式，无需显式调用 Build()
+
+// Desc 添加降序排序
+func (o *orderbys[Q]) Desc(column string) Q {
+	o.Value = append(o.Value, clause.OrderBy{Column: column, Desc: true})
+	return o.Parent
+}
+
+// Asc 添加升序排序
+func (o *orderbys[Q]) Asc(column string) Q {
+	o.Value = append(o.Value, clause.OrderBy{Column: column, Desc: false})
+	return o.Parent
+}
+
+// Desc 添加降序排序
+func Desc(column string) *Query {
+	return newQuery("").Desc(column)
+}
+
+// Asc 添加升序排序
+func Asc(column string) *Query {
+	return newQuery("").Asc(column)
 }

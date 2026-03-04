@@ -100,9 +100,7 @@ func OrWhere(field any, args ...any) *Query {
 //   - q.Not("age", ">", 18)
 //   - q.Not(clause.Eq{Column: "name", Value: "John"})
 //   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
-func Not(field any, args ...any) *Query {
-	return newQuery("").Not(field, args...)
-}
+// 注意: 如需使用全局 Not 函数，请使用 clause.Not 或 WhereNot 方法
 
 // OrderBy 添加ORDER BY子句到当前查询
 // 参数:

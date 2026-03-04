@@ -2,6 +2,13 @@ package query
 
 import "github.com/epkgs/query/clause"
 
+type genericPaginator[Q any] interface {
+	PaginationExpr() clause.Pagination
+	Limit(limit int) Q
+	Offset(offset int) Q
+	Paginate(page int, pageSize int) Q
+}
+
 type Pagination struct {
 	Offset int
 	Limit  int
@@ -10,29 +17,29 @@ type Pagination struct {
 var _ genericPaginator[*Query] = (*pagination[*Query])(nil)
 var _ clause.Expression = (*pagination[*Query])(nil)
 
-type pagination[P any] struct {
-	Parent P
+type pagination[Q any] struct {
+	Parent Q
 	Value  clause.Pagination
 }
 
-func (p *pagination[P]) PaginationExpr() clause.Pagination {
+func (p *pagination[Q]) PaginationExpr() clause.Pagination {
 	return p.Value
 }
 
 // Limit 设置查询的限制条数
-func (p *pagination[P]) Limit(limit int) P {
+func (p *pagination[Q]) Limit(limit int) Q {
 	p.Value.Limit = &limit
 	return p.Parent
 }
 
 // Offset 设置查询的偏移量
-func (p *pagination[P]) Offset(offset int) P {
+func (p *pagination[Q]) Offset(offset int) Q {
 	p.Value.Offset = offset
 	return p.Parent
 }
 
 // Paginate 设置分页参数
-func (p *pagination[P]) Paginate(page int, pageSize int) P {
+func (p *pagination[Q]) Paginate(page int, pageSize int) Q {
 	if page > 0 {
 		p.Offset((page - 1) * pageSize)
 	}
@@ -42,6 +49,6 @@ func (p *pagination[P]) Paginate(page int, pageSize int) P {
 	return p.Parent
 }
 
-func (p *pagination[P]) Build(builder clause.Builder) {
+func (p *pagination[Q]) Build(builder clause.Builder) {
 	p.Value.Build(builder)
 }
