@@ -200,10 +200,6 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector) {
 
 		for _, order := range orders {
 
-			if opt.orderHandler != nil {
-				order = opt.orderHandler(order) // 调用转换器
-			}
-
 			if order.Column == "" {
 				continue
 			}

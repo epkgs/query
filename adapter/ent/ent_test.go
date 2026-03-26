@@ -79,8 +79,8 @@ func TestWhereFunc_Empty(t *testing.T) {
 func TestOrderBy(t *testing.T) {
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 转换为 ent OrderBy 函数
 	orderByFunc := OrderBy(orders)
@@ -257,8 +257,8 @@ func TestQuery(t *testing.T) {
 
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 创建 Pagination 条件
 	limit := 10
@@ -346,7 +346,7 @@ func TestOrWhereFunc(t *testing.T) {
 // 测试 Not 条件转换
 func TestNotWhereFunc(t *testing.T) {
 	// 创建查询条件
-	q := query.Table("").Not("name", "John").Not("age", ">", 18)
+	q := query.Table("").Not(query.Eq("name", "John")).Not(query.Gt("age", 18))
 
 	// 获取 Where 表达式
 	where := q.WhereExpr()
@@ -564,8 +564,8 @@ func TestWithExprHandler(t *testing.T) {
 func TestWithOrderByHandler(t *testing.T) {
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 创建一个排序处理器，修改列名
 	handler := func(order clause.OrderBy) clause.OrderBy {
@@ -647,7 +647,7 @@ func TestMixedConditions(t *testing.T) {
 		Where("city", "New York").
 		OrWhere(func(w query.Wherer) query.Wherer {
 			w.Where("name", "John")
-			w.Not("age", ">", 65)
+			w.NotWhere("age", ">", 65)
 			return w
 		})
 
@@ -728,7 +728,7 @@ func BenchmarkQuery(b *testing.B) {
 	where := q.WhereExpr()
 
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
 
 	limit := 10
 	pagination := clause.Pagination{Limit: &limit, Offset: 20}

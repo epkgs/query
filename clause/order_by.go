@@ -15,7 +15,7 @@ func (o OrderBy) Build(builder Builder) {
 	}
 }
 
-type OrderBys []OrderBy
+type OrderBys []*OrderBy
 
 // Build build where clause
 func (o OrderBys) Build(builder Builder) {

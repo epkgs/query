@@ -110,8 +110,8 @@ func TestWhereScope_Empty(t *testing.T) {
 func TestOrderByScope(t *testing.T) {
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 转换为 gorm scope
 	scope := OrderBy(orders)
@@ -233,8 +233,8 @@ func TestQueryScope(t *testing.T) {
 
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
+	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 创建 Pagination 条件
 	limit := 10
@@ -325,7 +325,7 @@ func TestOrWhereScope(t *testing.T) {
 // 测试 Not 条件转换
 func TestNotWhereScope(t *testing.T) {
 	// 创建查询条件
-	q := query.Table("").Not("name", "John").Not("age", ">", 18)
+	q := query.Table("").Not(query.Eq("name", "John")).Not(query.Gt("age", 18))
 
 	// 获取 Where 表达式
 	where := q.WhereExpr()
@@ -501,10 +501,7 @@ func TestComparisonOperators(t *testing.T) {
 func TestWithExprHandler(t *testing.T) {
 	// 创建查询条件
 	q := query.Where("name", "John").Where("age", ">", 18)
-	where := q.WhereExpr()
-
-	// 创建一个表达式处理器，过滤掉 age 条件
-	handler := func(expr clause.Expression) clause.Expression {
+	where := q.WhereExpr(func(expr clause.Expression) clause.Expression {
 		switch e := expr.(type) {
 		case clause.Gt:
 			if e.Column == "age" {
@@ -512,10 +509,10 @@ func TestWithExprHandler(t *testing.T) {
 			}
 		}
 		return expr
-	}
+	})
 
 	// 转换为 gorm scope
-	scope := Where(where, WithExprHandler(handler))
+	scope := Where(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -547,20 +544,17 @@ func TestWithExprHandler(t *testing.T) {
 // 测试 OrderByHandler 选项
 func TestWithOrderByHandler(t *testing.T) {
 	// 创建 OrderBy 条件
-	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
-	orders = append(orders, clause.OrderBy{Column: "age", Desc: true})
+	q := query.OrderBy(clause.OrderBy{Column: "name", Desc: false}).OrderBy(clause.OrderBy{Column: "age", Desc: true})
 
-	// 创建一个排序处理器，修改列名
-	handler := func(order clause.OrderBy) clause.OrderBy {
+	orders := q.OrderByExpr(func(order *clause.OrderBy) *clause.OrderBy {
 		if order.Column == "name" {
 			order.Column = "user_name" // 修改列名
 		}
 		return order
-	}
+	})
 
 	// 转换为 gorm scope
-	scope := OrderBy(orders, WithOrderByHandler(handler))
+	scope := OrderBy(orders)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -634,7 +628,7 @@ func TestMixedConditions(t *testing.T) {
 		Where("city", "New York").
 		OrWhere(func(w query.Wherer) query.Wherer {
 			w.Where("name", "John")
-			w.Not("age", ">", 65)
+			w.NotWhere("age", ">", 65)
 			return w
 		})
 
@@ -687,11 +681,10 @@ func BenchmarkWhereScope(b *testing.B) {
 }
 
 func BenchmarkQueryScope(b *testing.B) {
-	q := query.Where("name", "John").Where("age", ">", 18)
+	q := query.Where("name", "John").Where("age", ">", 18).OrderBy(clause.OrderBy{Column: "name", Desc: false})
 	where := q.WhereExpr()
 
-	var orders clause.OrderBys
-	orders = append(orders, clause.OrderBy{Column: "name", Desc: false})
+	orders := q.OrderByExpr()
 
 	limit := 10
 	pagination := clause.Pagination{Limit: &limit, Offset: 20}
@@ -727,4 +720,3 @@ func ExampleWhere() {
 	fmt.Printf("SQL generated successfully")
 	// Output: SQL generated successfully
 }
-

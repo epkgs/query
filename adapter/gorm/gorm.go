@@ -6,42 +6,8 @@ import (
 	gormClause "gorm.io/gorm/clause"
 )
 
-type options struct {
-	exprHandler  ExprHandler
-	orderHandler OrderHandler
-}
-
-type Option func(*options)
-
-// ExprHandler 表达式处理器函数类型，用于在转换为GORM表达式前预处理clause.Expression
-// expr: 原始的查询表达式
-// 返回值: 预处理后的查询表达式
-type ExprHandler func(expr clause.Expression) clause.Expression
-
-func WithExprHandler(handler ExprHandler) Option {
-	return func(o *options) {
-		o.exprHandler = handler
-	}
-}
-
-// OrderHandler 排序处理器函数类型，用于在转换为GORM排序表达式前预处理clause.OrderBy
-// expr: 原始的排序表达式
-// 返回值: 预处理后的排序表达式
-type OrderHandler func(expr clause.OrderBy) clause.OrderBy
-
-func WithOrderByHandler(handler OrderHandler) Option {
-	return func(o *options) {
-		o.orderHandler = handler
-	}
-}
-
 // Where 将 clause.Where 转换为 gorm scope
-func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB {
-
-	opt := &options{}
-	for _, o := range opts {
-		o(opt)
-	}
+func Where(where clause.Where) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
 		if len(where.Exprs) == 0 {
@@ -49,7 +15,7 @@ func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB {
 		}
 
 		// 将 query/clause.Where 转换为 gorm/clause.Where
-		gormWhere := convertWhere(where, opt)
+		gormWhere := convertWhere(where)
 
 		if len(gormWhere.Exprs) == 0 {
 			return db
@@ -61,11 +27,11 @@ func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB {
 }
 
 // convertWhere 将 query/clause.Where 转换为 gorm/clause.Where
-func convertWhere(where clause.Where, opt *options) gormClause.Where {
+func convertWhere(where clause.Where) gormClause.Where {
 	gormExprs := make([]gormClause.Expression, 0, len(where.Exprs))
 
 	for _, expr := range where.Exprs {
-		gormExpr := convertExpr(expr, opt)
+		gormExpr := convertExpr(expr)
 		if gormExpr != nil {
 			gormExprs = append(gormExprs, gormExpr)
 		}
@@ -75,11 +41,7 @@ func convertWhere(where clause.Where, opt *options) gormClause.Where {
 }
 
 // convertExpr 将 query/clause.Expression 转换为 gorm/clause.Expression
-func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
-
-	if opt.exprHandler != nil {
-		expr = opt.exprHandler(expr) // 调用转换器
-	}
+func convertExpr(expr clause.Expression) gormClause.Expression {
 
 	if expr == nil {
 		return nil
@@ -105,7 +67,7 @@ func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
 	case clause.AndExpr:
 		var gormExprs []gormClause.Expression
 		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr, opt)
+			gormExpr := convertExpr(subExpr)
 			if gormExpr != nil {
 				gormExprs = append(gormExprs, gormExpr)
 			}
@@ -117,7 +79,7 @@ func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
 	case clause.OrExpr:
 		var gormExprs []gormClause.Expression
 		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr, opt)
+			gormExpr := convertExpr(subExpr)
 			if gormExpr != nil {
 				gormExprs = append(gormExprs, gormExpr)
 			}
@@ -129,7 +91,7 @@ func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
 	case clause.NotExpr:
 		var gormExprs []gormClause.Expression
 		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr, opt)
+			gormExpr := convertExpr(subExpr)
 			if gormExpr != nil {
 				gormExprs = append(gormExprs, gormExpr)
 			}
@@ -144,11 +106,7 @@ func convertExpr(expr clause.Expression, opt *options) gormClause.Expression {
 }
 
 // OrderBy 将 clause.OrderBys 转换为 gorm scope
-func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB {
-	opt := &options{}
-	for _, o := range opts {
-		o(opt)
-	}
+func OrderBy(orders clause.OrderBys) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
 		if len(orders) == 0 {
@@ -158,9 +116,6 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB 
 		gOrderByCols := []gormClause.OrderByColumn{}
 
 		for _, order := range orders {
-			if opt.orderHandler != nil {
-				order = opt.orderHandler(order) // 调用转换器
-			}
 
 			if order.Column == "" {
 				continue
@@ -193,10 +148,10 @@ func Pagination(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB {
 }
 
 // Query 将多个查询组件转换为 gorm scope
-func Query(where clause.Where, orders clause.OrderBys, pagination clause.Pagination, opts ...Option) func(db *gorm.DB) *gorm.DB {
+func Query(where clause.Where, orders clause.OrderBys, pagination clause.Pagination) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		db = Where(where, opts...)(db)
-		db = OrderBy(orders, opts...)(db)
+		db = Where(where)(db)
+		db = OrderBy(orders)(db)
 		db = Pagination(pagination)(db)
 		return db
 	}

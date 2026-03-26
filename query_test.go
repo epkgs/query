@@ -632,8 +632,9 @@ func TestQuery_BuildSelectWithClauseOrderBySlice(t *testing.T) {
 	q.Build(builder)
 
 	expectedSQL := "SELECT `id`, `name`, `age` FROM `users` ORDER BY `age` DESC, `name` ASC"
-	if builder.String() != expectedSQL {
-		t.Errorf("expected SQL: %s, got: %s", expectedSQL, builder.String())
+	builded := builder.String()
+	if builded != expectedSQL {
+		t.Errorf("expected SQL: %s, got: %s", expectedSQL, builded)
 	}
 }
 

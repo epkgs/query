@@ -7,7 +7,7 @@ import (
 )
 
 type genericWherer[Q any] interface {
-	WhereExpr() clause.Where
+	WhereExpr(walker ...ExprWalker) clause.Where
 	Where(field any, args ...any) Q
 	OrWhere(field any, args ...any) Q
 	NotWhere(field any, args ...any) Q
@@ -28,7 +28,7 @@ var _ genericWherer[*Query] = (*where[*Query])(nil)
 var _ clause.Expression = (*where[*Query])(nil)
 
 type whereExprExporter interface {
-	WhereExpr() clause.Where
+	WhereExpr(walker ...ExprWalker) clause.Where
 }
 
 type whereQuerier interface {
@@ -41,8 +41,51 @@ type where[Q whereQuerier] struct {
 	Value  clause.Where
 }
 
-func (w *where[Q]) WhereExpr() clause.Where {
-	return w.Value
+// ExprWalker 定义一个函数类型，用于遍历和修改 clause.Expression， 返回 nil 则表示删除该表达式
+type ExprWalker func(clause.Expression) clause.Expression
+
+func (w *where[Q]) WhereExpr(walker ...ExprWalker) clause.Where {
+
+	exps := w.Value.Exprs
+
+	for _, walk := range walker {
+		exps = walkExpressions(exps, walk)
+	}
+
+	return clause.Where{
+		Exprs: exps,
+	}
+}
+
+func walkExpressions(exprs []clause.Expression, walker ExprWalker) []clause.Expression {
+
+	copied := make([]clause.Expression, len(exprs))
+	copy(copied, exprs)
+
+	result := []clause.Expression{}
+	for _, exp := range copied {
+		switch e := exp.(type) {
+		case clause.AndExpr:
+			e.Exprs = walkExpressions(e.Exprs, walker)
+			result = append(result, e)
+
+		case clause.OrExpr:
+			e.Exprs = walkExpressions(e.Exprs, walker)
+			result = append(result, e)
+
+		case clause.NotExpr:
+			e.Exprs = walkExpressions(e.Exprs, walker)
+			result = append(result, e)
+
+		default:
+			newExp := walker(e)
+			if newExp != nil {
+				result = append(result, newExp)
+			}
+		}
+
+	}
+	return result
 }
 
 // Where 添加WHERE条件到当前查询
@@ -131,7 +174,7 @@ func (w *where[Q]) Build(builder clause.Builder) {
 }
 
 type Wherer interface {
-	WhereExpr() clause.Where
+	WhereExpr(walker ...ExprWalker) clause.Where
 	Where(field any, args ...any) Wherer
 	OrWhere(field any, args ...any) Wherer
 	NotWhere(field any, args ...any) Wherer
@@ -145,7 +188,7 @@ type whereBuilder struct {
 	Error error
 }
 
-func (w *whereBuilder) WhereExpr() clause.Where {
+func (w *whereBuilder) WhereExpr(walker ...ExprWalker) clause.Where {
 	return w.where
 }
 

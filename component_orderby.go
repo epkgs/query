@@ -10,14 +10,14 @@ type genericSorter[Q any] interface {
 	Asc(column string) Q
 	Desc(column string) Q
 	OrderBy(field any, orders ...any) Q
-	OrderByExpr() clause.OrderBys
+	OrderByExpr(walker ...OrderByWalker) clause.OrderBys
 }
 
 var _ genericSorter[*Query] = (*orderbys[*Query])(nil)
 var _ clause.Expression = (*orderbys[*Query])(nil)
 
 type orderbyExprExporter interface {
-	OrderByExpr() clause.OrderBys
+	OrderByExpr(walker ...OrderByWalker) clause.OrderBys
 }
 
 type orderbyQuerier interface {
@@ -33,8 +33,33 @@ type orderbys[Q orderbyQuerier] struct {
 }
 
 // OrderByExpr 返回当前的排序表达式
-func (o *orderbys[Q]) OrderByExpr() clause.OrderBys {
-	return o.Value
+func (o *orderbys[Q]) OrderByExpr(walker ...OrderByWalker) clause.OrderBys {
+	return walkOrderByExpr(o.Value, walker...)
+}
+
+// OrderByWalker 定义一个函数类型，用于遍历和修改 *clause.OrderBy， 返回 nil 则表示删除该表达式
+type OrderByWalker func(*clause.OrderBy) *clause.OrderBy
+
+func walkOrderByExpr(orderbys clause.OrderBys, walker ...OrderByWalker) clause.OrderBys {
+	if len(walker) == 0 {
+		return orderbys
+	}
+
+	copied := make(clause.OrderBys, len(orderbys))
+
+	copy(copied, orderbys)
+
+	result := make(clause.OrderBys, 0, len(orderbys))
+
+	for _, w := range walker {
+		for _, ob := range copied {
+			if newOb := w(ob); newOb != nil {
+				result = append(result, newOb)
+			}
+		}
+	}
+
+	return result
 }
 
 // OrderBy 添加排序条件
@@ -71,15 +96,28 @@ func (o *orderbys[Q]) OrderBy(field any, orders ...any) Q {
 
 	case clause.OrderBy:
 		// 处理单个clause.OrderBy
-		o.Value = append(o.Value, f)
+		o.Value = append(o.Value, &f)
 		// 处理额外的clause.OrderBy参数
-		for _, ord := range orders {
-			if ord, ok := ord.(clause.OrderBy); ok {
-				o.Value = append(o.Value, ord)
-			}
+		if len(orders) > 0 {
+			o.OrderBy(orders[0], orders[1:]...)
 		}
+
 	case []clause.OrderBy:
 		// 处理[]clause.OrderBy切片
+		for _, ob := range f {
+			newOb := ob // 先赋值、在传引用。否则直接传引用会导致指针指向最后一个元素的地址
+			o.Value = append(o.Value, &newOb)
+		}
+	case *clause.OrderBy:
+		// 处理单个clause.OrderBy
+		o.Value = append(o.Value, f)
+		// 处理额外的clause.OrderBy参数
+		if len(orders) > 0 {
+			o.OrderBy(orders[0], orders[1:]...)
+		}
+
+	case []*clause.OrderBy:
+		// 处理[]*clause.OrderBy切片
 		o.Value = append(o.Value, f...)
 	case clause.OrderBys:
 		// 处理clause.OrderBys集合
@@ -128,7 +166,7 @@ func buildOrderBy(column string, direction ...string) clause.OrderBys {
 				isDesc = strings.ToLower(strings.TrimSpace(pices[1])) == "desc"
 			}
 
-			orders = append(orders, clause.OrderBy{
+			orders = append(orders, &clause.OrderBy{
 				Column: fieldName,
 				Desc:   isDesc,
 			})
@@ -151,13 +189,13 @@ func buildOrderBy(column string, direction ...string) clause.OrderBys {
 
 // Desc 添加降序排序
 func (o *orderbys[Q]) Desc(column string) Q {
-	o.Value = append(o.Value, clause.OrderBy{Column: column, Desc: true})
+	o.Value = append(o.Value, &clause.OrderBy{Column: column, Desc: true})
 	return o.Parent
 }
 
 // Asc 添加升序排序
 func (o *orderbys[Q]) Asc(column string) Q {
-	o.Value = append(o.Value, clause.OrderBy{Column: column, Desc: false})
+	o.Value = append(o.Value, &clause.OrderBy{Column: column, Desc: false})
 	return o.Parent
 }
 
