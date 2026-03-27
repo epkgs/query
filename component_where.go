@@ -49,6 +49,9 @@ func (w *where[Q]) WhereExpr(walker ...ExprWalker) clause.Where {
 	exps := w.Value.Exprs
 
 	for _, walk := range walker {
+		if walk == nil {
+			continue
+		}
 		exps = walkExpressions(exps, walk)
 	}
 

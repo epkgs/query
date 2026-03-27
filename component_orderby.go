@@ -37,6 +37,9 @@ func (o *orderbys[Q]) OrderByExpr(walker ...OrderByWalker) clause.OrderBys {
 	orderbys := o.Value
 
 	for _, walk := range walker {
+		if walk == nil {
+			continue
+		}
 		orderbys = walkOrderByExpr(orderbys, walk)
 	}
 
