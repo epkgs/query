@@ -34,28 +34,27 @@ type orderbys[Q orderbyQuerier] struct {
 
 // OrderByExpr 返回当前的排序表达式
 func (o *orderbys[Q]) OrderByExpr(walker ...OrderByWalker) clause.OrderBys {
-	return walkOrderByExpr(o.Value, walker...)
+	orderbys := o.Value
+
+	for _, walk := range walker {
+		orderbys = walkOrderByExpr(orderbys, walk)
+	}
+
+	return orderbys
 }
 
 // OrderByWalker 定义一个函数类型，用于遍历和修改 *clause.OrderBy， 返回 nil 则表示删除该表达式
 type OrderByWalker func(*clause.OrderBy) *clause.OrderBy
 
-func walkOrderByExpr(orderbys clause.OrderBys, walker ...OrderByWalker) clause.OrderBys {
-	if len(walker) == 0 {
-		return orderbys
-	}
+func walkOrderByExpr(orderbys clause.OrderBys, walker OrderByWalker) clause.OrderBys {
 
 	copied := make(clause.OrderBys, len(orderbys))
-
 	copy(copied, orderbys)
 
-	result := make(clause.OrderBys, 0, len(orderbys))
-
-	for _, w := range walker {
-		for _, ob := range copied {
-			if newOb := w(ob); newOb != nil {
-				result = append(result, newOb)
-			}
+	result := make(clause.OrderBys, 0, len(copied))
+	for _, ob := range copied {
+		if newOb := walker(ob); newOb != nil {
+			result = append(result, newOb)
 		}
 	}
 
