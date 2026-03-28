@@ -14,7 +14,7 @@ func FromOrderBy(orderBy ordering.OrderBy) clause.OrderBys {
 	// 遍历 ordering.OrderBy 的 Fields
 	for _, field := range orderBy.Fields {
 		// 将每个 ordering.Field 转换为 clause.OrderBy
-		orderBys = append(orderBys, clause.OrderBy{
+		orderBys = append(orderBys, &clause.OrderBy{
 			Column: field.Path, // Field.Path 映射到 Column
 			Desc:   field.Desc, // Field.Desc 映射到 Desc
 		})
