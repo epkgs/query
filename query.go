@@ -54,6 +54,9 @@ func Table(tableName string) *Query {
 }
 
 // Where 添加WHERE条件到当前查询
+//
+// Deprecated: 使用 Eq, Neq, Gt 等方法替代，例如：q.Eq("name", "John")
+//
 // 参数:
 //   - field: 字段名、表达式或表达式数组
 //   - args: 条件参数，格式根据field类型而定
@@ -71,6 +74,9 @@ func Where(field any, args ...any) *Query {
 }
 
 // OrWhere 添加OR WHERE条件到当前查询
+//
+// Deprecated: 使用 Or 方法替代，例如：q.Or("name", "John")
+//
 // 参数:
 //   - field: 字段名、表达式或表达式数组
 //   - args: 条件参数，格式根据field类型而定
@@ -86,21 +92,6 @@ func Where(field any, args ...any) *Query {
 func OrWhere(field any, args ...any) *Query {
 	return newQuery("").OrWhere(field, args...)
 }
-
-// Not 添加NOT条件到当前查询
-// 参数:
-//   - field: 字段名、表达式或表达式数组
-//   - args: 条件参数，格式根据field类型而定
-//
-// 返回值:
-//   - 当前实例，支持链式调用
-//
-// 示例:
-//   - q.Not("name", "John")
-//   - q.Not("age", ">", 18)
-//   - q.Not(clause.Eq{Column: "name", Value: "John"})
-//   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
-// 注意: 如需使用全局 Not 函数，请使用 clause.Not 或 WhereNot 方法
 
 // OrderBy 添加ORDER BY子句到当前查询
 // 参数:

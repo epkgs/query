@@ -10,14 +10,14 @@ type genericSorter[Q any] interface {
 	Asc(column string) Q
 	Desc(column string) Q
 	OrderBy(field any, orders ...any) Q
-	OrderByExpr(walker ...OrderByWalker) clause.OrderBys
+	CloneOrderByExpr(walkers ...OrderByColumnWalker) clause.OrderBys
 }
 
 var _ genericSorter[*Query] = (*orderbys[*Query])(nil)
 var _ clause.Expression = (*orderbys[*Query])(nil)
 
 type orderbyExprExporter interface {
-	OrderByExpr(walker ...OrderByWalker) clause.OrderBys
+	CloneOrderByExpr(walkers ...OrderByColumnWalker) clause.OrderBys
 }
 
 type orderbyQuerier interface {
@@ -33,6 +33,8 @@ type orderbys[Q orderbyQuerier] struct {
 }
 
 // OrderByExpr 返回当前的排序表达式
+//
+// Deprecated: 使用 CloneOrderByExpr 替代
 func (o *orderbys[Q]) OrderByExpr(walker ...OrderByWalker) clause.OrderBys {
 	orderbys := o.Value
 
@@ -44,6 +46,49 @@ func (o *orderbys[Q]) OrderByExpr(walker ...OrderByWalker) clause.OrderBys {
 	}
 
 	return orderbys
+}
+
+type OrderByColumnWalker func(column string, desc bool) (string, bool)
+
+// CloneOrderByExpr 克隆当前的排序表达式
+// walkers 是一个函数类型，用于遍历和修改 column 和 desc， 返回 空 column 则表示删除该表达式
+func (o *orderbys[Q]) CloneOrderByExpr(walkers ...OrderByColumnWalker) clause.OrderBys {
+	copied := make(clause.OrderBys, len(o.Value))
+	copy(copied, o.Value)
+
+	if len(walkers) == 0 {
+		return copied
+	}
+
+	mapping := func(column string, desc bool) (string, bool) {
+		for _, walk := range walkers {
+			if walk == nil {
+				continue
+			}
+			column, desc = walk(column, desc)
+			if column == "" {
+				return "", desc
+			}
+		}
+		return column, desc
+	}
+
+	result := make(clause.OrderBys, 0, len(copied))
+	for _, ob := range copied {
+		if ob == nil {
+			continue
+		}
+		column, desc := mapping(ob.Column, ob.Desc)
+		if column == "" {
+			continue
+		}
+		result = append(result, &clause.OrderBy{
+			Column: column,
+			Desc:   desc,
+		})
+	}
+
+	return result
 }
 
 // OrderByWalker 定义一个函数类型，用于遍历和修改 *clause.OrderBy， 返回 nil 则表示删除该表达式

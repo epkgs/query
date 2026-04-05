@@ -2,12 +2,13 @@ package query
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/epkgs/query/clause"
 )
 
 type genericWherer[Q any] interface {
-	WhereExpr(walker ...ExprWalker) clause.Where
+	CloneWhereExpr(walker ...WhereExprWalker) clause.Where
 	Where(field any, args ...any) Q
 	OrWhere(field any, args ...any) Q
 	NotWhere(field any, args ...any) Q
@@ -28,7 +29,7 @@ var _ genericWherer[*Query] = (*where[*Query])(nil)
 var _ clause.Expression = (*where[*Query])(nil)
 
 type whereExprExporter interface {
-	WhereExpr(walker ...ExprWalker) clause.Where
+	CloneWhereExpr(walker ...WhereExprWalker) clause.Where
 }
 
 type whereQuerier interface {
@@ -44,6 +45,9 @@ type where[Q whereQuerier] struct {
 // ExprWalker 定义一个函数类型，用于遍历和修改 clause.Expression， 返回 nil 则表示删除该表达式
 type ExprWalker func(clause.Expression) clause.Expression
 
+// WhereExpr 克隆 Where 表达式，并应用 walker 函数进行修改
+//
+// Deprecated: 使用 CloneWhereExpr 替代
 func (w *where[Q]) WhereExpr(walker ...ExprWalker) clause.Where {
 
 	exps := w.Value.Exprs
@@ -60,30 +64,152 @@ func (w *where[Q]) WhereExpr(walker ...ExprWalker) clause.Where {
 	}
 }
 
-func walkExpressions(exprs []clause.Expression, walker ExprWalker) []clause.Expression {
+// WhereExprWalker 定义一个函数类型，用于遍历和修改 Where 表达式， 返回空字符串表示删除该表达式
+type WhereExprWalker func(column string, value any) (string, any)
+
+// CloneWhereExpr 克隆 Where 表达式，并应用 walker 函数进行修改
+//
+// walker 函数返回空字符串表示删除该表达式
+func (w *where[Q]) CloneWhereExpr(walker ...WhereExprWalker) clause.Where {
+
+	if len(walker) == 0 {
+
+		exprs := make([]clause.Expression, len(w.Value.Exprs))
+		copy(exprs, w.Value.Exprs)
+
+		return clause.Where{
+			Exprs: exprs,
+		}
+	}
+
+	mapping := func(column string, value any) (string, any) {
+		for _, walk := range walker {
+			if walk == nil {
+				continue
+			}
+			column, value = walk(column, value)
+			if column == "" {
+				return "", value
+			}
+		}
+		return column, value
+	}
+
+	exprs := w.Value.Exprs
+
+	exprs = walkExpressions(exprs, func(expr clause.Expression) clause.Expression {
+
+		if expr == nil {
+			return nil
+		}
+
+		switch e := expr.(type) {
+		case clause.Eq:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Neq:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Gt:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Gte:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Lt:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Lte:
+			if e.Column, e.Value = mapping(e.Column, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case clause.Like:
+			prefix, suffix := "", ""
+			value := e.Value.(string)
+			if strings.HasPrefix(value, "%") {
+				prefix = "%"
+				value = strings.TrimPrefix(value, "%")
+			}
+			if strings.HasSuffix(value, "%") {
+				suffix = "%"
+				value = strings.TrimSuffix(value, "%")
+			}
+			if col, val := mapping(e.Column, value); col != "" {
+				e.Column = col
+				e.Value = prefix + val.(string) + suffix
+				return e
+			}
+			return nil
+		case clause.IN:
+			values := e.Values
+			column := e.Column
+			for i, v := range values {
+				column, values[i] = mapping(e.Column, v)
+				if column == "" {
+					return nil
+				}
+			}
+			e.Column = column
+			e.Values = values
+			return e
+		}
+		return expr
+	})
+
+	return clause.Where{
+		Exprs: exprs,
+	}
+}
+
+func walkExpressions(exprs []clause.Expression, walkers ...ExprWalker) []clause.Expression {
 
 	copied := make([]clause.Expression, len(exprs))
 	copy(copied, exprs)
+
+	if len(walkers) == 0 {
+		return copied
+	}
 
 	result := []clause.Expression{}
 	for _, exp := range copied {
 		switch e := exp.(type) {
 		case clause.AndExpr:
-			e.Exprs = walkExpressions(e.Exprs, walker)
+			e.Exprs = walkExpressions(e.Exprs, walkers...)
 			result = append(result, e)
 
 		case clause.OrExpr:
-			e.Exprs = walkExpressions(e.Exprs, walker)
+			e.Exprs = walkExpressions(e.Exprs, walkers...)
 			result = append(result, e)
 
 		case clause.NotExpr:
-			e.Exprs = walkExpressions(e.Exprs, walker)
+			e.Exprs = walkExpressions(e.Exprs, walkers...)
 			result = append(result, e)
 
 		default:
-			newExp := walker(e)
-			if newExp != nil {
-				result = append(result, newExp)
+
+			for _, walk := range walkers {
+				if walk == nil {
+					continue
+				}
+				if e == nil {
+					break
+				}
+				e = walk(e)
+			}
+
+			if e != nil {
+				result = append(result, e)
 			}
 		}
 
@@ -176,57 +302,6 @@ func (w *where[Q]) Build(builder clause.Builder) {
 	w.Value.Build(builder)
 }
 
-type Wherer interface {
-	WhereExpr(walker ...ExprWalker) clause.Where
-	Where(field any, args ...any) Wherer
-	OrWhere(field any, args ...any) Wherer
-	NotWhere(field any, args ...any) Wherer
-}
-
-var _ Wherer = (*whereBuilder)(nil)
-
-// whereBuilder 实现 Wherer 接口
-type whereBuilder struct {
-	where clause.Where
-	Error error
-}
-
-func (w *whereBuilder) WhereExpr(walker ...ExprWalker) clause.Where {
-	return w.where
-}
-
-func (w *whereBuilder) Where(field any, args ...any) Wherer {
-	expressions, err := buildCondition(field, args...)
-	if err != nil {
-		w.Error = err
-		return w
-	}
-	w.where.Merge(clause.Where{Exprs: expressions})
-	return w
-}
-
-func (w *whereBuilder) OrWhere(field any, args ...any) Wherer {
-	expressions, err := buildCondition(field, args...)
-	if err != nil {
-		w.Error = err
-		return w
-	}
-	if len(expressions) > 0 {
-		w.where.Merge(clause.Where{Exprs: []clause.Expression{clause.Or(expressions...)}})
-	}
-	return w
-}
-
-func (w *whereBuilder) NotWhere(field any, args ...any) Wherer {
-	expressions, err := buildCondition(field, args...)
-	if err != nil {
-		w.Error = err
-		return w
-	}
-	w.where.Merge(clause.Where{Exprs: []clause.Expression{clause.Not(expressions...)}})
-	return w
-}
-
 // buildCondition 构建条件表达式
 // 参数:
 //   - column: 字段名、表达式或表达式数组
@@ -245,11 +320,11 @@ func (w *whereBuilder) NotWhere(field any, args ...any) Wherer {
 func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 
 	switch c := column.(type) {
-	case func(Wherer) Wherer:
+	case func(*Query) *Query:
 		// 创建whereBuilder实例
-		builder := &whereBuilder{where: clause.Where{}}
+		q := Table("")
 		// 调用闭包函数
-		exprs := c(builder).WhereExpr().Exprs
+		exprs := c(q).CloneWhereExpr().Exprs
 		if len(exprs) == 0 {
 			return exprs, nil
 		}
@@ -365,7 +440,7 @@ func (w *where[Q]) Or(querys ...Q) Q {
 			return w.Parent
 		}
 
-		qs := query.WhereExpr()
+		qs := query.CloneWhereExpr()
 		if len(qs.Exprs) > 0 {
 			var expr clause.Expression
 			if len(qs.Exprs) == 1 {
@@ -406,7 +481,7 @@ func (w *where[Q]) And(querys ...Q) Q {
 			return w.Parent
 		}
 
-		qs := query.WhereExpr()
+		qs := query.CloneWhereExpr()
 		if len(qs.Exprs) > 0 {
 			var expr clause.Expression
 			if len(qs.Exprs) == 1 {
@@ -437,7 +512,7 @@ func (w *where[Q]) Not(query Q) Q {
 		return w.Parent
 	}
 
-	qs := query.WhereExpr()
+	qs := query.CloneWhereExpr()
 	if len(qs.Exprs) > 0 {
 		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Not(qs.Exprs...)}})
 	}

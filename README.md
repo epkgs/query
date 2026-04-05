@@ -59,9 +59,9 @@ import (
 q := query.Table("users").Where("name", "John").Select("id", "name")
 db, err := gorm.Open(...) // 初始化GORM
 db.Scopes(
-    adapter.Where(q.WhereExpr()),
-    adapter.OrderBy(q.OrderByExpr()),
-    adapter.Pagination(q.PaginationExpr()),
+    adapter.Where(q.CloneWhereExpr()),
+    adapter.OrderBy(q.CloneOrderByExpr()),
+    adapter.Pagination(q.ClonePaginationExpr()),
 ).Find(&users)
 ```
 
@@ -80,9 +80,9 @@ q := query.Table("users").Where("name", "John").Select("id", "name")
 selector := sql.Selector{}
 selector.From(sql.Table("users"))
 // 转换过滤条件
-whereScope := adapter.Where(q.WhereExpr())
-orderScope := adapter.OrderBy(q.OrderByExpr())
-paginationScope := adapter.Pagination(q.PaginationExpr())
+whereScope := adapter.Where(q.CloneWhereExpr())
+orderScope := adapter.OrderBy(q.CloneOrderByExpr())
+paginationScope := adapter.Pagination(q.ClonePaginationExpr())
 // 应用所有查询条件
 whereScope(&selector)
 orderScope(&selector)

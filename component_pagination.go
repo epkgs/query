@@ -3,7 +3,7 @@ package query
 import "github.com/epkgs/query/clause"
 
 type genericPaginator[Q any] interface {
-	PaginationExpr() clause.Pagination
+	ClonePaginationExpr() clause.Pagination
 	Limit(limit int) Q
 	Offset(offset int) Q
 	Paginate(page int, pageSize int) Q
@@ -22,8 +22,27 @@ type pagination[Q any] struct {
 	Value  clause.Pagination
 }
 
+// PaginationExpr 返回当前的分页表达式
+//
+// Deprecated: 使用 ClonePaginationExpr 替代
 func (p *pagination[Q]) PaginationExpr() clause.Pagination {
 	return p.Value
+}
+
+// ClonePaginationExpr 克隆分页表达式，返回一个新的 Pagination 实例
+func (p *pagination[Q]) ClonePaginationExpr() clause.Pagination {
+
+	pg := clause.Pagination{
+		Limit:  nil,
+		Offset: p.Value.Offset,
+	}
+
+	if p.Value.Limit != nil {
+		limit := *p.Value.Limit
+		pg.Limit = &limit
+	}
+
+	return pg
 }
 
 // Limit 设置查询的限制条数

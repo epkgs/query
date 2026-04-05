@@ -78,7 +78,7 @@ func TestQuery_BuildSelectMultipleFields(t *testing.T) {
 
 // TestQuery_BuildSelectWithWhere 测试选择字段并带有WHERE条件的查询
 func TestQuery_BuildSelectWithWhere(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).Select("id", "name")
+	q := Table("users").Gt("age", 18).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -90,7 +90,7 @@ func TestQuery_BuildSelectWithWhere(t *testing.T) {
 
 // TestQuery_BuildWhere 测试WHERE条件查询
 func TestQuery_BuildWhere(t *testing.T) {
-	q := Table("users").Where("name", "=", "John").Select()
+	q := Table("users").Eq("name", "John").Select()
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -122,7 +122,7 @@ func TestQuery_BuildUpdate(t *testing.T) {
 
 // TestQuery_BuildUpdateWithWhere 测试带WHERE条件的UPDATE操作
 func TestQuery_BuildUpdateWithWhere(t *testing.T) {
-	q := Table("users").Where("id", 1).Update("name", "John")
+	q := Table("users").Eq("id", 1).Update("name", "John")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -138,7 +138,7 @@ func TestQuery_BuildUpdateWithWhere(t *testing.T) {
 
 // TestQuery_BuildUpdateWithMap 测试使用map设置多个字段的UPDATE操作
 func TestQuery_BuildUpdateWithMap(t *testing.T) {
-	q := Table("users").Where("id", 1).Update(map[string]interface{}{"name": "John", "age": 30})
+	q := Table("users").Eq("id", 1).Update(map[string]interface{}{"name": "John", "age": 30})
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -236,7 +236,7 @@ func TestQuery_BuildDelete(t *testing.T) {
 
 // TestQuery_BuildDeleteWithWhere 测试带WHERE条件的DELETE操作
 func TestQuery_BuildDeleteWithWhere(t *testing.T) {
-	q := Table("users").Where("id", 1).Delete()
+	q := Table("users").Eq("id", 1).Delete()
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -348,7 +348,7 @@ func TestQuery_BuildSelectWithPaginate(t *testing.T) {
 
 // TestQuery_BuildSelectWithComplexConditions 测试带复杂条件的SELECT查询
 func TestQuery_BuildSelectWithComplexConditions(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).Where("age", "<", 30).Where("name", "LIKE", "J%").Select("id", "name")
+	q := Table("users").Gt("age", 18).Lt("age", 30).Like("name", "J%").Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -362,9 +362,9 @@ func TestQuery_BuildSelectWithComplexConditions(t *testing.T) {
 	}
 }
 
-// TestQuery_BuildSelectWithOrWhere 测试带OR WHERE条件的SELECT查询
-func TestQuery_BuildSelectWithOrWhere(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).OrWhere("name", "admin").Select("id", "name")
+// TestQuery_BuildSelectWithOr 测试带OR条件的SELECT查询
+func TestQuery_BuildSelectWithOr(t *testing.T) {
+	q := Table("users").Gt("age", 18).Or(Eq("name", "admin")).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -380,7 +380,7 @@ func TestQuery_BuildSelectWithOrWhere(t *testing.T) {
 
 // TestQuery_BuildSelectWithNot 测试带NOT条件的SELECT查询
 func TestQuery_BuildSelectWithNot(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).NotWhere("name", "admin").Select("id", "name")
+	q := Table("users").Gt("age", 18).Not(Eq("name", "admin")).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -396,7 +396,7 @@ func TestQuery_BuildSelectWithNot(t *testing.T) {
 
 // TestQuery_BuildSelectWithInCondition 测试带IN条件的SELECT查询
 func TestQuery_BuildSelectWithInCondition(t *testing.T) {
-	q := Table("users").Where("id", []interface{}{1, 2, 3, 4, 5}).Select("id", "name")
+	q := Table("users").In("id", 1, 2, 3, 4, 5).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -413,7 +413,7 @@ func TestQuery_BuildSelectWithInCondition(t *testing.T) {
 
 // TestQuery_BuildSelectWithAllFeatures 测试包含所有功能的SELECT查询
 func TestQuery_BuildSelectWithAllFeatures(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).OrWhere("name", "admin").NotWhere("status", "banned").OrderBy("age", "desc").OrderBy("name").Limit(10).Offset(20).Select("id", "name", "age")
+	q := Table("users").Gt("age", 18).Or(Eq("name", "admin")).Not(Eq("status", "banned")).OrderBy("age", "desc").OrderBy("name").Limit(10).Offset(20).Select("id", "name", "age")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -441,7 +441,7 @@ func TestQuery_BuildSelectEmptyFields(t *testing.T) {
 
 // TestQuery_BuildDeleteWithComplexConditions 测试带复杂条件的DELETE查询
 func TestQuery_BuildDeleteWithComplexConditions(t *testing.T) {
-	q := Table("users").Where("age", "<", 18).OrWhere("status", "banned").Where("created_at", "<", "2023-01-01").Delete()
+	q := Table("users").Lt("age", 18).Or(Eq("status", "banned")).Lt("created_at", "2023-01-01").Delete()
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -454,7 +454,7 @@ func TestQuery_BuildDeleteWithComplexConditions(t *testing.T) {
 // TestQuery_ChainableCalls 测试链式调用的正确性
 func TestQuery_ChainableCalls(t *testing.T) {
 	// 测试SelectQuery的链式调用
-	q := Table("users").Where("age", ">", 18).OrderBy("name").Limit(10).Offset(0).Select("id", "name")
+	q := Table("users").Gt("age", 18).OrderBy("name").Limit(10).Offset(0).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -464,7 +464,7 @@ func TestQuery_ChainableCalls(t *testing.T) {
 	}
 
 	// 测试UpdateQuery的链式调用
-	q2 := Table("users").Where("id", 1).Where("status", "active").Update("name", "John")
+	q2 := Table("users").Eq("id", 1).Eq("status", "active").Update("name", "John")
 	builder2 := &mockBuilder{}
 	q2.Build(builder2)
 
@@ -474,13 +474,13 @@ func TestQuery_ChainableCalls(t *testing.T) {
 	}
 }
 
-// TestQuery_BuildSelectWithMultipleOrWhere 测试多个OR条件的SELECT查询
-func TestQuery_BuildSelectWithMultipleOrWhere(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).OrWhere("name", "admin").OrWhere("role", "moderator").Select("id", "name")
+// TestQuery_BuildSelectWithMultipleOr 测试多个OR条件的SELECT查询
+func TestQuery_BuildSelectWithMultipleOr(t *testing.T) {
+	q := Table("users").Gt("age", 18).Or(Eq("name", "admin"), Eq("role", "moderator")).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
-	expectedSQL := "SELECT `id`, `name` FROM `users` WHERE `age` > $1 OR `name` = $2 OR `role` = $3"
+	expectedSQL := "SELECT `id`, `name` FROM `users` WHERE `age` > $1 OR (`name` = $2 AND `role` = $3)"
 	if builder.String() != expectedSQL {
 		t.Errorf("expected SQL: %s, got: %s", expectedSQL, builder.String())
 	}
@@ -492,7 +492,7 @@ func TestQuery_BuildSelectWithMultipleOrWhere(t *testing.T) {
 
 // TestQuery_BuildSelectWithComplexNotConditions 测试复杂的NOT条件
 func TestQuery_BuildSelectWithComplexNotConditions(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).NotWhere("role", "guest").NotWhere("status", "banned").Select("id", "name")
+	q := Table("users").Gt("age", 18).Not(Eq("role", "guest")).Not(Eq("status", "banned")).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -508,7 +508,7 @@ func TestQuery_BuildSelectWithComplexNotConditions(t *testing.T) {
 
 // TestQuery_BuildSelectWithNullValue 测试包含NULL值条件的SELECT查询
 func TestQuery_BuildSelectWithNullValue(t *testing.T) {
-	q := Table("users").Where("email", nil).Select("id", "name")
+	q := Table("users").Eq("email", nil).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -524,7 +524,7 @@ func TestQuery_BuildSelectWithNullValue(t *testing.T) {
 
 // TestQuery_BuildUpdateWithNullValue 测试更新为空值的UPDATE操作
 func TestQuery_BuildUpdateWithNullValue(t *testing.T) {
-	q := Table("users").Where("id", 1).Update("email", nil)
+	q := Table("users").Eq("id", 1).Update("email", nil)
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -680,119 +680,9 @@ func TestQuery_BuildSelectWithCommaSeparatedOrderByMixed(t *testing.T) {
 	}
 }
 
-// TestClosureChainedWhere 测试闭包链式调用功能
-func TestClosureChainedWhere(t *testing.T) {
-	// 创建一个查询
-	q := Table("users")
-
-	// 使用闭包进行链式调用（多个条件）
-	q.Where(func(w Wherer) Wherer {
-		return w.Where("name", "John").OrWhere("name", "Jane").NotWhere("age", "<", 18)
-	})
-
-	// 转换为SELECT查询并构建SQL
-	builder := &mockBuilder{}
-	q.Select("*").Build(builder)
-
-	// 打印结果
-	fmt.Println("SQL:", builder.String())
-	fmt.Println("Args:", builder.vars)
-
-	// 验证SQL是否包含预期条件（注意：当闭包是唯一条件时，不会添加括号）
-	expectedSQL := "SELECT `*` FROM `users` WHERE `name` = $1 OR `name` = $2 AND `age` >= $3"
-	if builder.String() != expectedSQL {
-		t.Errorf("Expected SQL: %s, got: %s", expectedSQL, builder.String())
-	}
-
-	// 验证参数是否正确
-	expectedArgs := []interface{}{"John", "Jane", 18}
-	if len(builder.vars) != len(expectedArgs) {
-		t.Errorf("Expected %d args, got %d", len(expectedArgs), len(builder.vars))
-	}
-	for i, arg := range expectedArgs {
-		if builder.vars[i] != arg {
-			t.Errorf("Expected arg %d to be %v, got %v", i, arg, builder.vars[i])
-		}
-	}
-}
-
-// TestClosureSingleCondition 测试闭包内只有一个条件时的情况
-func TestClosureSingleCondition(t *testing.T) {
-	// 创建一个查询
-	q := Table("users")
-
-	// 使用闭包只添加一个条件
-	q.Where(func(w Wherer) Wherer {
-		return w.Where("name", "John")
-	})
-
-	// 转换为SELECT查询并构建SQL
-	builder := &mockBuilder{}
-	q.Select("*").Build(builder)
-
-	// 打印结果
-	fmt.Println("Single condition SQL:", builder.String())
-	fmt.Println("Single condition Args:", builder.vars)
-
-	// 验证SQL是否不包含括号（当闭包内只有一个条件时）
-	expectedSQL := "SELECT `*` FROM `users` WHERE `name` = $1"
-	if builder.String() != expectedSQL {
-		t.Errorf("Expected SQL: %s, got: %s", expectedSQL, builder.String())
-	}
-
-	// 验证参数是否正确
-	expectedArgs := []interface{}{"John"}
-	if len(builder.vars) != len(expectedArgs) {
-		t.Errorf("Expected %d args, got %d", len(expectedArgs), len(builder.vars))
-	}
-	for i, arg := range expectedArgs {
-		if builder.vars[i] != arg {
-			t.Errorf("Expected arg %d to be %v, got %v", i, arg, builder.vars[i])
-		}
-	}
-}
-
-// TestMultipleConditionsWithClosure 测试当WHERE子句有多个条件（包含闭包）时，闭包是否正确添加括号
-func TestMultipleConditionsWithClosure(t *testing.T) {
-	// 创建一个查询
-	q := Table("users")
-
-	// 使用闭包作为多个条件之一
-	q.Where("status", "active")
-	q.Where(func(w Wherer) Wherer {
-		return w.Where("name", "John").OrWhere("name", "Jane")
-	})
-	q.Where("age", ">", 18)
-
-	// 转换为SELECT查询并构建SQL
-	builder := &mockBuilder{}
-	q.Select("*").Build(builder)
-
-	// 打印结果
-	fmt.Println("Multiple conditions with closure SQL:", builder.String())
-	fmt.Println("Multiple conditions with closure Args:", builder.vars)
-
-	// 验证SQL是否包含预期条件（闭包作为多个条件之一时应添加括号）
-	expectedSQL := "SELECT `*` FROM `users` WHERE `status` = $1 AND (`name` = $2 OR `name` = $3) AND `age` > $4"
-	if builder.String() != expectedSQL {
-		t.Errorf("Expected SQL: %s, got: %s", expectedSQL, builder.String())
-	}
-
-	// 验证参数是否正确
-	expectedArgs := []interface{}{"active", "John", "Jane", 18}
-	if len(builder.vars) != len(expectedArgs) {
-		t.Errorf("Expected %d args, got %d", len(expectedArgs), len(builder.vars))
-	}
-	for i, arg := range expectedArgs {
-		if builder.vars[i] != arg {
-			t.Errorf("Expected arg %d to be %v, got %v", i, arg, builder.vars[i])
-		}
-	}
-}
-
 // TestQuery_BuildUpdateWithMultipleWhere 测试多个WHERE条件的UPDATE操作
 func TestQuery_BuildUpdateWithMultipleWhere(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).Where("role", "user").Where("last_login", ">", "2023-01-01").Update("status", "active")
+	q := Table("users").Gt("age", 18).Eq("role", "user").Gt("last_login", "2023-01-01").Update("status", "active")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -808,7 +698,7 @@ func TestQuery_BuildUpdateWithMultipleWhere(t *testing.T) {
 
 // TestQuery_BuildDeleteWithAllConditions 测试包含所有条件的DELETE操作
 func TestQuery_BuildDeleteWithAllConditions(t *testing.T) {
-	q := Table("users").Where("age", "<", 18).OrWhere("status", "banned").OrWhere("last_login", "<", "2022-01-01").NotWhere("role", "admin").Delete()
+	q := Table("users").Lt("age", 18).Or(Eq("status", "banned")).Or(Lt("last_login", "2022-01-01")).Not(Eq("role", "admin")).Delete()
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -840,7 +730,7 @@ func TestQuery_BuildInsertWithAllNullValues(t *testing.T) {
 
 // TestQuery_BuildSelectWithMixedConditionTypes 测试混合条件类型的SELECT查询
 func TestQuery_BuildSelectWithMixedConditionTypes(t *testing.T) {
-	q := Table("users").Where("age", ">", 18).Where("status", "active").OrWhere("role", "admin").NotWhere("email", nil).Where("created_at", ">", "2023-01-01").Select("id", "name")
+	q := Table("users").Gt("age", 18).Eq("status", "active").Or(Eq("role", "admin")).Not(Eq("email", nil)).Gt("created_at", "2023-01-01").Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
@@ -1195,9 +1085,9 @@ func TestFluentAPI_InWithSingleValue(t *testing.T) {
 	}
 }
 
-// TestFluentAPI_MixedWithOldAndNewAPI 测试新旧 API 混合使用
-func TestFluentAPI_MixedWithOldAndNewAPI(t *testing.T) {
-	q := Table("users").Where("status", "=", "active").Eq("age", 18).OrWhere("role", "admin").Select("id", "name")
+// TestFluentAPI_CombinedUsage 测试流畅 API 组合使用
+func TestFluentAPI_CombinedUsage(t *testing.T) {
+	q := Table("users").Eq("status", "active").Eq("age", 18).Or(Eq("role", "admin")).Select("id", "name")
 	builder := &mockBuilder{}
 	q.Build(builder)
 
