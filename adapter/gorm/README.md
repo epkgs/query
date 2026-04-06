@@ -48,9 +48,9 @@ func main() {
     var users []User
     err = db.Model(&User{}).
         Scopes(adapter.Query(
-            q.CloneWhereExpr(),
-            q.CloneOrderByExpr(),
-            q.ClonePaginationExpr(),
+            q.WhereExpr(),
+            q.OrderByExpr(),
+            q.PaginationExpr(),
         )).
         Find(&users).Error
 }
@@ -70,7 +70,7 @@ func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB
 
 ```go
 q := query.Where("name", "John").Where("age", ">", 18)
-whereClause := q.CloneWhereExpr()
+whereClause := q.WhereExpr()
 
 db.Model(&User{}).
     Scopes(adapter.Where(whereClause)).
@@ -89,7 +89,7 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB
 
 ```go
 q := query.Table("users").OrderBy("age", "desc").OrderBy("name")
-orderBys := q.CloneOrderByExpr()
+orderBys := q.OrderByExpr()
 
 db.Model(&User{}).
     Scopes(adapter.OrderBy(orderBys)).
@@ -108,7 +108,7 @@ func Pagination(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB
 
 ```go
 q := query.Table("users").Limit(10).Offset(20)
-pagination := q.ClonePaginationExpr()
+pagination := q.PaginationExpr()
 
 db.Model(&User{}).
     Scopes(adapter.Pagination(pagination)).
@@ -133,9 +133,9 @@ q := query.Table("users").
 
 db.Model(&User{}).
     Scopes(adapter.Query(
-        q.CloneWhereExpr(),
-        q.CloneOrderByExpr(),
-        q.ClonePaginationExpr(),
+        q.WhereExpr(),
+        q.OrderByExpr(),
+        q.PaginationExpr(),
     )).
     Find(&users)
 ```
@@ -255,7 +255,7 @@ q := query.Table("users").
     })
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.CloneWhereExpr())).
+    Scopes(adapter.Where(q.WhereExpr())).
     Find(&users)
 ```
 
@@ -268,7 +268,7 @@ q := query.Table("users").
     Not("age", ">", 65)
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.CloneWhereExpr())).
+    Scopes(adapter.Where(q.WhereExpr())).
     Find(&users)
 
 // GORM 会将 NOT 转换为反向操作符：
@@ -281,7 +281,7 @@ db.Model(&User{}).
 q := query.Where("id", "IN", []interface{}{1, 2, 3, 4, 5})
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.CloneWhereExpr())).
+    Scopes(adapter.Where(q.WhereExpr())).
     Find(&users)
 
 // 生成: WHERE `id` IN (?,?,?,?,?)
@@ -293,7 +293,7 @@ db.Model(&User{}).
 q := query.Where("name", "LIKE", "%John%")
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.CloneWhereExpr())).
+    Scopes(adapter.Where(q.WhereExpr())).
     Find(&users)
 
 // 生成: WHERE `name` LIKE ?
@@ -334,9 +334,9 @@ orderHandler := func(order clause.OrderBy) clause.OrderBy {
 var users []User
 err := db.Model(&User{}).
     Scopes(adapter.Query(
-        q.CloneWhereExpr(),
-        q.CloneOrderByExpr(),
-        q.ClonePaginationExpr(),
+        q.WhereExpr(),
+        q.OrderByExpr(),
+        q.PaginationExpr(),
         adapter.WithExprHandler(exprHandler),
         adapter.WithOrderByHandler(orderHandler),
     )).

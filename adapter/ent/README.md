@@ -47,18 +47,18 @@ func main() {
     ctx := context.Background()
     users, err := client.User.Query().
         Modify(adapter.Query(
-            q.CloneWhereExpr(),
-            q.CloneOrderByExpr(),
-            q.ClonePaginationExpr(),
+            q.WhereExpr(),
+            q.OrderByExpr(),
+            q.PaginationExpr(),
         )).
         All(ctx)
 
     // 方法二：分别应用各个组件
     users, err = client.User.Query().
         Modify(
-            adapter.Where(q.CloneWhereExpr()),
-            adapter.OrderBy(q.CloneOrderByExpr()),
-            adapter.Pagination(q.ClonePaginationExpr()),
+            adapter.Where(q.WhereExpr()),
+            adapter.OrderBy(q.OrderByExpr()),
+            adapter.Pagination(q.PaginationExpr()),
         ).
         All(ctx)
 }
@@ -79,7 +79,7 @@ q := query.Where("name", "John").Where("age", ">", 18)
 selector := sql.Select("*").From(sql.Table("users"))
 
 // 应用条件
-whereFunc := adapter.Where(q.CloneWhereExpr())
+whereFunc := adapter.Where(q.WhereExpr())
 whereFunc(selector)
 
 // 获取 SQL 和参数
@@ -102,7 +102,7 @@ func Where(where clause.Where, opts ...Option) func(s *sql.Selector)
 
 ```go
 q := query.Where("name", "John").Where("age", ">", 18)
-whereClause := q.CloneWhereExpr()
+whereClause := q.WhereExpr()
 
 client.User.Query().
     Modify(adapter.Where(whereClause)).
@@ -121,7 +121,7 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector)
 
 ```go
 q := query.Table("users").OrderBy("age", "desc").OrderBy("name")
-orderBys := q.CloneOrderByExpr()
+orderBys := q.OrderByExpr()
 
 client.User.Query().
     Modify(adapter.OrderBy(orderBys)).
@@ -140,7 +140,7 @@ func Pagination(pagination clause.Pagination) func(s *sql.Selector)
 
 ```go
 q := query.Table("users").Limit(10).Offset(20)
-pagination := q.ClonePaginationExpr()
+pagination := q.PaginationExpr()
 
 client.User.Query().
     Modify(adapter.Pagination(pagination)).
@@ -165,9 +165,9 @@ q := query.Table("users").
 
 client.User.Query().
     Modify(adapter.Query(
-        q.CloneWhereExpr(),
-        q.CloneOrderByExpr(),
-        q.ClonePaginationExpr(),
+        q.WhereExpr(),
+        q.OrderByExpr(),
+        q.PaginationExpr(),
     )).
     All(ctx)
 ```
@@ -325,7 +325,7 @@ q := query.Table("users").
     })
 
 users, err := client.User.Query().
-    Modify(adapter.Where(q.CloneWhereExpr())).
+    Modify(adapter.Where(q.WhereExpr())).
     All(ctx)
 
 // 生成 SQL: 
@@ -341,7 +341,7 @@ q := query.Table("users").
     Not("age", ">", 65)
 
 users, err := client.User.Query().
-    Modify(adapter.Where(q.CloneWhereExpr())).
+    Modify(adapter.Where(q.WhereExpr())).
     All(ctx)
 
 // 生成 SQL:
@@ -354,7 +354,7 @@ users, err := client.User.Query().
 q := query.Where("id", "IN", []interface{}{1, 2, 3, 4, 5})
 
 users, err := client.User.Query().
-    Modify(adapter.Where(q.CloneWhereExpr())).
+    Modify(adapter.Where(q.WhereExpr())).
     All(ctx)
 
 // 生成 SQL: 
@@ -367,7 +367,7 @@ users, err := client.User.Query().
 q := query.Where("name", "LIKE", "%John%")
 
 users, err := client.User.Query().
-    Modify(adapter.Where(q.CloneWhereExpr())).
+    Modify(adapter.Where(q.WhereExpr())).
     All(ctx)
 
 // 生成 SQL: 
@@ -387,7 +387,7 @@ q := query.Table("users").
     })
 
 users, err := client.User.Query().
-    Modify(adapter.Where(q.CloneWhereExpr())).
+    Modify(adapter.Where(q.WhereExpr())).
     All(ctx)
 
 // 生成 SQL:
@@ -439,9 +439,9 @@ orderHandler := func(order clause.OrderBy) clause.OrderBy {
 // 执行查询
 users, err := client.User.Query().
     Modify(adapter.Query(
-        q.CloneWhereExpr(),
-        q.CloneOrderByExpr(),
-        q.ClonePaginationExpr(),
+        q.WhereExpr(),
+        q.OrderByExpr(),
+        q.PaginationExpr(),
         adapter.WithExprHandler(exprHandler),
         adapter.WithOrderByHandler(orderHandler),
     )).
@@ -456,7 +456,7 @@ q := query.Where("age", ">", 18)
 
 users, err := client.User.Query().
     Where(user.StatusEQ("active")).  // Ent 原生条件
-    Modify(adapter.Where(q.CloneWhereExpr())). // 适配器条件
+    Modify(adapter.Where(q.WhereExpr())). // 适配器条件
     All(ctx)
 ```
 
@@ -481,9 +481,9 @@ func SearchUsers(nameFilter string, ageMin int, sortBy string) ([]*ent.User, err
     
     return client.User.Query().
         Modify(adapter.Query(
-            q.CloneWhereExpr(),
-            q.CloneOrderByExpr(),
-            q.ClonePaginationExpr(),
+            q.WhereExpr(),
+            q.OrderByExpr(),
+            q.PaginationExpr(),
         )).
         All(ctx)
 }

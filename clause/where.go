@@ -1,8 +1,23 @@
 package clause
 
+import "strings"
+
 const (
 	AndWithSpace = " AND "
 	OrWithSpace  = " OR "
+)
+
+type Operator string
+
+const (
+	OpEQ   Operator = "="
+	OpNEQ  Operator = "!="
+	OpGT   Operator = ">"
+	OpGTE  Operator = ">="
+	OpLT   Operator = "<"
+	OpLTE  Operator = "<="
+	OpLIKE Operator = "LIKE"
+	OpIN   Operator = "IN"
 )
 
 // Where where clause
@@ -32,6 +47,134 @@ func (w *Where) Merge(where Where) *Where {
 		w.Exprs = exprs
 	}
 	return w
+}
+
+// Map 遍历表达式列表，并生成新的表达式列表
+//
+// mapper 为表达式遍历函数，返回 nil 表示移除该表达式
+func (w Where) Map(mapper func(expr Expression) Expression) Where {
+	exprs := mapExpressions(w.Exprs, mapper)
+	return Where{Exprs: exprs}
+}
+
+func mapExpressions(exprs []Expression, walkers ...func(Expression) Expression) []Expression {
+
+	copied := make([]Expression, len(exprs))
+	copy(copied, exprs)
+
+	if len(walkers) == 0 {
+		return copied
+	}
+
+	result := []Expression{}
+	for _, exp := range copied {
+		switch e := exp.(type) {
+		case AndExpr:
+			e.Exprs = mapExpressions(e.Exprs, walkers...)
+			result = append(result, e)
+
+		case OrExpr:
+			e.Exprs = mapExpressions(e.Exprs, walkers...)
+			result = append(result, e)
+
+		case NotExpr:
+			e.Exprs = mapExpressions(e.Exprs, walkers...)
+			result = append(result, e)
+
+		default:
+
+			for _, walk := range walkers {
+				if walk == nil {
+					continue
+				}
+				if e == nil {
+					break
+				}
+				e = walk(e)
+			}
+
+			if e != nil {
+				result = append(result, e)
+			}
+		}
+
+	}
+	return result
+}
+
+// MapColumn 遍历表达式列表，并生成新的表达式列表
+//
+// mapper 为表达式遍历函数，返回空字符串表示移除该表达式
+func (w Where) MapColumn(mapper func(column string, op Operator, value any) (string, any)) Where {
+	return w.Map(func(expr Expression) Expression {
+
+		if expr == nil {
+			return nil
+		}
+
+		switch e := expr.(type) {
+		case Eq:
+			if e.Column, e.Value = mapper(e.Column, OpEQ, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Neq:
+			if e.Column, e.Value = mapper(e.Column, OpNEQ, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Gt:
+			if e.Column, e.Value = mapper(e.Column, OpGT, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Gte:
+			if e.Column, e.Value = mapper(e.Column, OpGTE, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Lt:
+			if e.Column, e.Value = mapper(e.Column, OpLT, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Lte:
+			if e.Column, e.Value = mapper(e.Column, OpLTE, e.Value); e.Column != "" {
+				return e
+			}
+			return nil
+		case Like:
+			prefix, suffix := "", ""
+			value := e.Value.(string)
+			if strings.HasPrefix(value, "%") {
+				prefix = "%"
+				value = strings.TrimPrefix(value, "%")
+			}
+			if strings.HasSuffix(value, "%") {
+				suffix = "%"
+				value = strings.TrimSuffix(value, "%")
+			}
+			if col, val := mapper(e.Column, OpLIKE, value); col != "" {
+				e.Column = col
+				e.Value = prefix + val.(string) + suffix
+				return e
+			}
+			return nil
+		case IN:
+			values := e.Values
+			column := e.Column
+			for i, v := range values {
+				column, values[i] = mapper(e.Column, OpIN, v)
+				if column == "" {
+					return nil
+				}
+			}
+			e.Column = column
+			e.Values = values
+			return e
+		}
+		return expr
+	})
 }
 
 func And(exprs ...Expression) Expression {

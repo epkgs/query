@@ -39,7 +39,7 @@ func TestWhereScope(t *testing.T) {
 	q := query.Eq("name", "John").Gt("age", 18)
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -229,7 +229,7 @@ func TestPaginationScope_LimitOnly(t *testing.T) {
 func TestQueryScope(t *testing.T) {
 	// 创建 Where 条件
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
@@ -286,7 +286,7 @@ func TestOrScope(t *testing.T) {
 	q.Or(query.Eq("city", "New York"))
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -324,7 +324,7 @@ func TestNotWhereScope(t *testing.T) {
 	q := query.Table("").Not(query.Eq("name", "John")).Not(query.Gt("age", 18))
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -367,7 +367,7 @@ func TestInWhereScope(t *testing.T) {
 	q := query.In("id", 1, 2, 3)
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -409,7 +409,7 @@ func TestLikeWhereScope(t *testing.T) {
 	q := query.Like("name", "%John%")
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -463,7 +463,7 @@ func TestComparisonOperators(t *testing.T) {
 			q := tt.builder()
 
 			// 获取 Where 表达式
-			where := q.CloneWhereExpr()
+			where := q.WhereExpr()
 
 			// 转换为 gorm scope
 			scope := Where(where)
@@ -490,7 +490,7 @@ func TestComparisonOperators(t *testing.T) {
 func TestWithExprHandler(t *testing.T) {
 	// 创建查询条件
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.CloneWhereExpr(func(column string, value any) (string, any) {
+	where := q.WhereExpr().MapColumn(func(column string, op clause.Operator, value any) (string, any) {
 		if column == "age" {
 			return "", value // 过滤掉 age 条件
 		}
@@ -532,7 +532,7 @@ func TestWithOrderByHandler(t *testing.T) {
 	// 创建 OrderBy 条件
 	q := query.OrderBy(clause.OrderBy{Column: "name", Desc: false}).OrderBy(clause.OrderBy{Column: "age", Desc: true})
 
-	orders := q.CloneOrderByExpr(func(column string, desc bool) (string, bool) {
+	orders := q.OrderByExpr().MapColumn(func(column string, desc bool) (string, bool) {
 		if column == "name" {
 			column = "user_name" // 修改列名
 		}
@@ -572,7 +572,7 @@ func TestComplexNestedConditions(t *testing.T) {
 			query.And(query.Eq("city", "New York"), query.Lt("age", 65)))
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -605,7 +605,7 @@ func TestMixedConditions(t *testing.T) {
 		Or(query.Eq("name", "John"), query.Not(query.Gt("age", 65)))
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)
@@ -639,7 +639,7 @@ func TestMixedConditions(t *testing.T) {
 // Benchmark 测试
 func BenchmarkWhereScope(b *testing.B) {
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -654,9 +654,9 @@ func BenchmarkWhereScope(b *testing.B) {
 
 func BenchmarkQueryScope(b *testing.B) {
 	q := query.Eq("name", "John").Gt("age", 18).OrderBy(clause.OrderBy{Column: "name", Desc: false})
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
-	orders := q.CloneOrderByExpr()
+	orders := q.OrderByExpr()
 
 	limit := 10
 	pagination := clause.Pagination{Limit: &limit, Offset: 20}
@@ -676,7 +676,7 @@ func BenchmarkQueryScope(b *testing.B) {
 func ExampleWhere() {
 	// 创建查询条件
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 gorm scope
 	scope := Where(where)

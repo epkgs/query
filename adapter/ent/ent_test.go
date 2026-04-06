@@ -17,7 +17,7 @@ func TestWhereFunc(t *testing.T) {
 	q := query.Where("name", "John").Where("age", ">", 18)
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -253,7 +253,7 @@ func TestQuery(t *testing.T) {
 	// 创建 Where 条件
 	q := query.Eq("name", "John").
 		Gt("age", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 创建 OrderBy 条件
 	var orders clause.OrderBys
@@ -314,7 +314,7 @@ func TestOrWhereFunc(t *testing.T) {
 	q.OrWhere("city", "New York")
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -349,7 +349,7 @@ func TestNotWhereFunc(t *testing.T) {
 	q := query.Table("").Not(query.Eq("name", "John")).Not(query.Gt("age", 18))
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -387,7 +387,7 @@ func TestInWhereFunc(t *testing.T) {
 	wherer := query.Where("id", "IN", []any{1, 2, 3})
 
 	// 获取 Where 表达式
-	where := wherer.CloneWhereExpr()
+	where := wherer.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -429,7 +429,7 @@ func TestLikeWhereFunc(t *testing.T) {
 	q := query.Where("name", "LIKE", "%John%")
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -490,7 +490,7 @@ func TestComparisonOperators(t *testing.T) {
 			q := query.Where(field, tt.operator, tt.value)
 
 			// 获取 Where 表达式
-			where := q.CloneWhereExpr()
+			where := q.WhereExpr()
 
 			// 转换为 ent Where 函数
 			whereFunc := Where(where)
@@ -517,7 +517,7 @@ func TestComparisonOperators(t *testing.T) {
 func TestWithExprHandler(t *testing.T) {
 	// 创建查询条件
 	q := query.Where("name", "John").Where("age", ">", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 创建一个表达式处理器，过滤掉 age 条件
 	handler := func(expr clause.Expression) clause.Expression {
@@ -613,7 +613,7 @@ func TestComplexNestedConditions(t *testing.T) {
 		})
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -652,7 +652,7 @@ func TestMixedConditions(t *testing.T) {
 		})
 
 	// 获取 Where 表达式
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)
@@ -712,7 +712,7 @@ func TestLikeWhereFunc_InvalidValue(t *testing.T) {
 // Benchmark 测试
 func BenchmarkWhereFunc(b *testing.B) {
 	q := query.Where("name", "John").Where("age", ">", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -725,7 +725,7 @@ func BenchmarkWhereFunc(b *testing.B) {
 
 func BenchmarkQuery(b *testing.B) {
 	q := query.Where("name", "John").Where("age", ">", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	var orders clause.OrderBys
 	orders = append(orders, &clause.OrderBy{Column: "name", Desc: false})
@@ -746,7 +746,7 @@ func BenchmarkQuery(b *testing.B) {
 func ExampleWhere() {
 	// 创建查询条件
 	q := query.Where("name", "John").Where("age", ">", 18)
-	where := q.CloneWhereExpr()
+	where := q.WhereExpr()
 
 	// 转换为 ent Where 函数
 	whereFunc := Where(where)

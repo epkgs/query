@@ -32,3 +32,39 @@ func (o OrderBys) Build(builder Builder) {
 		order.Build(builder)
 	}
 }
+
+func (obs OrderBys) Map(mapper func(*OrderBy) *OrderBy) OrderBys {
+
+	result := make(OrderBys, 0, len(obs))
+
+	for _, ob := range obs {
+		newOb := mapper(&OrderBy{
+			Column: ob.Column,
+			Desc:   ob.Desc,
+		})
+		if newOb == nil {
+			continue
+		}
+		result = append(result, newOb)
+	}
+
+	return result
+}
+
+func (obs OrderBys) MapColumn(mapper func(string, bool) (string, bool)) OrderBys {
+
+	result := make(OrderBys, 0, len(obs))
+
+	for _, ob := range obs {
+		column, desc := mapper(ob.Column, ob.Desc)
+		if column == "" {
+			continue
+		}
+		result = append(result, &OrderBy{
+			Column: column,
+			Desc:   desc,
+		})
+	}
+
+	return result
+}

@@ -49,7 +49,7 @@ func FromFilter(filter filtering.Filter) (clause.Where, error) {
 		}
 	}
 
-	return q.CloneWhereExpr(), nil
+	return q.WhereExpr(), nil
 }
 
 // parseExpr 将 *exprpb.Expr 转换为 []clause.Expression
