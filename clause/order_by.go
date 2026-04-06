@@ -51,7 +51,7 @@ func (obs OrderBys) Map(mapper func(*OrderBy) *OrderBy) OrderBys {
 	return result
 }
 
-func (obs OrderBys) MapColumn(mapper func(string, bool) (string, bool)) OrderBys {
+func (obs OrderBys) MapColumn(mapper func(column string, desc bool) (string, bool)) OrderBys {
 
 	result := make(OrderBys, 0, len(obs))
 
