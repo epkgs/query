@@ -33,6 +33,9 @@ func (o OrderBys) Build(builder Builder) {
 	}
 }
 
+// Map 遍历排序条件列表，并生成新的排序条件列表
+//
+// mapper 为排序条件遍历函数，返回nil表示移除该排序条件
 func (obs OrderBys) Map(mapper func(*OrderBy) *OrderBy) OrderBys {
 
 	result := make(OrderBys, 0, len(obs))
@@ -51,6 +54,9 @@ func (obs OrderBys) Map(mapper func(*OrderBy) *OrderBy) OrderBys {
 	return result
 }
 
+// MapColumn 遍历排序条件列表，并生成新的排序条件列表
+//
+// mapper 为排序条件遍历函数，返回空字符串表示移除该排序条件
 func (obs OrderBys) MapColumn(mapper func(column string, desc bool) (string, bool)) OrderBys {
 
 	result := make(OrderBys, 0, len(obs))
