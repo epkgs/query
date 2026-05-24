@@ -2,7 +2,9 @@ package query
 
 import "github.com/epkgs/query/clause"
 
-// UpdateQuery UPDATE查询结构体
+// UpdateQuery 是 UPDATE 查询结构体。
+// 包含表名、更新字段值、WHERE 条件和分页参数，
+// 通过 Build 方法将完整的 UPDATE 语句写入 Builder。
 type UpdateQuery struct {
 	table string
 	errorRecord

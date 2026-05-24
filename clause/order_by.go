@@ -15,9 +15,11 @@ func (o OrderBy) Build(builder Builder) {
 	}
 }
 
+// OrderBys 是排序条件列表，表示一组 ORDER BY 子句。
+// 它是 []*OrderBy 的类型别名，提供了 Map 和 MapColumn 方法用于遍历和转换排序条件。
 type OrderBys []*OrderBy
 
-// Build build where clause
+// Build 构建 ORDER BY 子句。
 func (o OrderBys) Build(builder Builder) {
 
 	if len(o) > 0 {

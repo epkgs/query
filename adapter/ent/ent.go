@@ -1,3 +1,34 @@
+// Package ent 提供了将 query/clause 查询组件转换为 Ent ORM 查询条件的适配器。
+//
+// 该适配器将 clause.Where、clause.OrderBys、clause.Pagination 转换为
+// Ent 的 sql.Selector 修改函数（func(*sql.Selector)），
+// 可直接用于 ent/client 的 Modify 方法或 sql.Selector 操作。
+//
+// 与 AIP 配合使用的典型流程：
+//
+//	import (
+//	    aip "github.com/epkgs/query/adapter/aip"
+//	    entadapter "github.com/epkgs/query/adapter/ent"
+//	)
+//
+//	// 1. 解析 AIP 过滤和排序
+//	filter, _ := filtering.ParseFilter(request, declarations)
+//	whereClause, _ := aip.FromFilter(filter)
+//	orderBys := aip.FromOrderBy(parsedOrderBy)
+//
+//	// 2. 使用 ExprHandler 映射字段名
+//	handler := func(expr clause.Expression) clause.Expression {
+//	    if eq, ok := expr.(clause.Eq); ok {
+//	        eq.Column = fieldMappings[eq.Column]
+//	    }
+//	    return expr
+//	}
+//
+//	// 3. 应用到 Ent 查询
+//	client.User.Query().Modify(entadapter.Query(
+//	    whereClause, orderBys, clause.Pagination{},
+//	    entadapter.WithExprHandler(handler),
+//	)).All(ctx)
 package ent
 
 import (
@@ -14,29 +45,50 @@ type options struct {
 
 type Option func(*options)
 
-// ExprHandler 表达式处理器函数类型，用于在转换为 ENT Selector 前预处理clause.Expression
-// expr: 原始的查询表达式
-// 返回值: 预处理后的查询表达式
+// ExprHandler 表达式处理器函数类型。
+// 在转换为 Ent Predicate 前对 clause.Expression 进行预处理，
+// 通常用于将 clause 的字段名映射为 ent schema 定义的列名。
+//
+// 示例（字段名映射）：
+//
+//	handler := func(expr clause.Expression) clause.Expression {
+//	    switch e := expr.(type) {
+//	    case clause.Eq:
+//	        e.Column = fieldMappings[e.Column]
+//	        return e
+//	    case clause.Like:
+//	        e.Column = fieldMappings[e.Column]
+//	        return e
+//	    }
+//	    return expr
+//	}
 type ExprHandler func(expr clause.Expression) clause.Expression
 
+// WithExprHandler 设置表达式处理器。
+// 在 Where/Query 转换过程中，每个 clause.Expression 都会经过该处理器，
+// 常用于将 API 暴露的字段名映射为 ent schema 的实际数据库列名。
 func WithExprHandler(handler ExprHandler) Option {
 	return func(o *options) {
 		o.exprHandler = handler
 	}
 }
 
-// OrderHandler 排序处理器函数类型，用于在转换为 ENT Selector 前预处理clause.OrderBy
-// expr: 原始的排序表达式
-// 返回值: 预处理后的排序表达式
+// OrderHandler 排序处理器函数类型。
+// 在转换为 Ent 排序条件前对 clause.OrderBy 进行预处理，
+// 通常用于将排序字段名映射为 ent schema 的实际列名。
 type OrderHandler func(expr clause.OrderBy) clause.OrderBy
 
+// WithOrderByHandler 设置排序处理器。
+// 在 OrderBy/Query 转换过程中，每个 clause.OrderBy 都会经过该处理器。
 func WithOrderByHandler(handler OrderHandler) Option {
 	return func(o *options) {
 		o.orderHandler = handler
 	}
 }
 
-// Where 将 clause.Where 转换为 ent 的 Where 函数
+// Where 将 clause.Where 转换为 Ent 的 sql.Selector 修改函数。
+// 支持通过 Option 设置 ExprHandler/OrderHandler 进行字段映射。
+// 返回的函数可直接传入 client.Query().Modify() 或 sql.Selector 操作。
 func Where(where clause.Where, opts ...Option) func(s *sql.Selector) {
 
 	opt := &options{}
@@ -186,7 +238,8 @@ func convertToEntPredicate(pre *sql.Predicate, expr clause.Expression, opt *opti
 	}
 }
 
-// OrderBy 将 clause.OrderBys 转换为 ent 的 OrderBy 函数
+// OrderBy 将 clause.OrderBys 转换为 Ent 的排序函数。
+// 支持通过 Option 设置 OrderHandler 进行字段映射。
 func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector) {
 	opt := &options{}
 	for _, o := range opts {
@@ -199,6 +252,10 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector) {
 		}
 
 		for _, order := range orders {
+
+			if opt.orderHandler != nil {
+				*order = opt.orderHandler(*order)
+			}
 
 			if order.Column == "" {
 				continue
@@ -213,7 +270,7 @@ func OrderBy(orders clause.OrderBys, opts ...Option) func(s *sql.Selector) {
 	}
 }
 
-// Pagination 将 clause.Pagination 转换为 ent 的 Pagination 函数
+// Pagination 将 clause.Pagination 转换为 Ent 的 LIMIT/OFFSET 设置函数。
 func Pagination(pagination clause.Pagination) func(s *sql.Selector) {
 	return func(s *sql.Selector) {
 
@@ -227,7 +284,9 @@ func Pagination(pagination clause.Pagination) func(s *sql.Selector) {
 	}
 }
 
-// Query 将多个查询组件转换为 ent 的查询函数
+// Query 将 WHERE、ORDER BY 和分页三个查询组件一次性转换为 Ent sql.Selector 修改函数。
+// 这是 Where、OrderBy、Pagination 三个函数的便捷组合。
+// 支持通过 Option 设置 ExprHandler/OrderHandler 进行字段映射。
 func Query(where clause.Where, orders clause.OrderBys, pagination clause.Pagination, opts ...Option) func(s *sql.Selector) {
 	return func(s *sql.Selector) {
 		Where(where, opts...)(s)

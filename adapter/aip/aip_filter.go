@@ -1,3 +1,23 @@
+// Package aip 提供了将 Google AIP（API Improvement Proposals）标准的
+// 过滤（Filter）和排序（OrderBy）转换为 query/clause 查询组件的适配器。
+//
+// AIP 是 Google 提出的 API 设计标准，广泛用于 gRPC/gRPC-Gateway 服务中。
+// 该适配器解析 AIP 过滤语法（如 "name = 'John' AND age >= 18"）
+// 和排序语法（如 "name desc, age asc"），
+// 将其转换为 query/clause 中的通用查询表示。
+//
+// 典型工作流程：
+//
+//	// 1. 使用 go.einride.tech/aip 解析 HTTP 请求参数
+//	filter, _ := filtering.ParseFilter(request, declarations)
+//	orderBy, _ := ordering.ParseOrderBy(orderingRequest)
+//
+//	// 2. 转换为 query/clause 组件
+//	whereClause, _ := aip.FromFilter(filter)
+//	orderBys := aip.FromOrderBy(orderBy)
+//
+//	// 3. 通过 GORM/Ent 适配器应用到 ORM 查询
+//	db.Scopes(gormadapter.Query(whereClause, orderBys, clause.Pagination{})).Find(&users)
 package aip
 
 import (
@@ -10,7 +30,9 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
-// FromFilter 将 AIP Filter 转换为 clause.Where
+// FromFilter 将 AIP 标准的 filtering.Filter 转换为 clause.Where。
+// 支持 AIP 过滤语法中的所有常见运算符：=, !=, >, >=, <, <=, IN, NOT, AND, OR。
+// 当 Filter.CheckedExpr 为空时（即未传递过滤参数），返回空的 clause.Where。
 func FromFilter(filter filtering.Filter) (clause.Where, error) {
 	// 创建 Query 对象
 	q := query.Table("")

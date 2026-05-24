@@ -2,7 +2,9 @@ package query
 
 import "github.com/epkgs/query/clause"
 
-// SelectQuery SELECT查询结构体
+// SelectQuery 是 SELECT 查询结构体。
+// 继承 WHERE 条件、ORDER BY 排序和分页参数，
+// 通过 Build 方法将完整的 SELECT 语句写入 Builder。
 type SelectQuery struct {
 	table string
 	errorRecord

@@ -19,81 +19,9 @@
 go get github.com/epkgs/query
 ```
 
-## 🔌 适配器
-
-该库设计了适配器机制，可以将查询转换为不同数据库的SQL语句或查询条件。
-
-### 🎯 AIP适配器
-
-支持Google API Improvement Proposals (AIP)的过滤和排序语法转换。
-
-```go
-import (
-    adapter "github.com/epkgs/query/adapter/aip"
-    "github.com/epkgs/query/clause"
-    filtering "go.einride.tech/aip/filtering"
-    ordering "go.einride.tech/aip/ordering"
-)
-
-// 解析AIP过滤条件
-filter, err := filtering.ParseFilter(filteringRequest, declarations)
-// 转换为clause.Where
-whereClause, err := adapter.FromFilter(filter)
-
-// 解析AIP排序条件
-orderBy, err := ordering.ParseOrderBy(orderingRequest)
-// 转换为clause.OrderBys
-orderBys := adapter.FromOrderBy(orderBy)
-```
-
-### 🐬 GORM适配器
-
-支持GORM ORM框架的查询转换。
-
-```go
-import (
-    adapter "github.com/epkgs/query/adapter/gorm"
-    "gorm.io/gorm"
-)
-
-q := query.Table("users").Where("name", "John").Select("id", "name")
-db, err := gorm.Open(...) // 初始化GORM
-db.Scopes(
-    adapter.Where(q.WhereExpr()),
-    adapter.OrderBy(q.OrderByExpr()),
-    adapter.Pagination(q.PaginationExpr()),
-).Find(&users)
-```
-
-### 🔄 Ent适配器
-
-支持Ent ORM框架的查询转换。
-
-```go
-import (
-	"entgo.io/ent/dialect/sql"
-    adapter "github.com/epkgs/query/adapter/ent"
-)
-
-q := query.Table("users").Where("name", "John").Select("id", "name")
-// 使用 Selector 构建查询
-selector := sql.Selector{}
-selector.From(sql.Table("users"))
-// 转换过滤条件
-whereScope := adapter.Where(q.WhereExpr())
-orderScope := adapter.OrderBy(q.OrderByExpr())
-paginationScope := adapter.Pagination(q.PaginationExpr())
-// 应用所有查询条件
-whereScope(&selector)
-orderScope(&selector)
-paginationScope(&selector)
-// 执行操作
-query, args := selector.Query()
-```
-
 ## 🚀 快速开始
 
-### 🔍 SELECT查询
+### 🔍 SELECT 查询
 
 ```go
 import "github.com/epkgs/query"
@@ -101,212 +29,393 @@ import "github.com/epkgs/query"
 // 基本查询
 q := query.Table("users").Select("id", "name", "age")
 
-// 带WHERE条件
-q := query.Table("users").Where("age", ">", 18).Select("id", "name", "age")
+// 带 WHERE 条件的查询
+q := query.Table("users").
+    Where("age", ">", 18).
+    Where("status", "active").
+    Select("id", "name", "age")
 
-// 带排序
-q := query.Table("users").OrderBy("age", "desc").OrderBy("name").Select("id", "name", "age")
-
-// 带分页
-q := query.Table("users").Limit(10).Offset(20).Select("id", "name", "age")
-
-// 链式调用
-q := query.Table("users").Where("age", ">", 18).OrWhere("name", "admin").OrderBy("age", "desc").Limit(10).Select("id", "name", "age")
+// 流畅 API 写法（推荐）
+q := query.Table("users").
+    Eq("status", "active").
+    Gte("age", 18).
+    Lte("age", 65).
+    Asc("created_at").
+    Limit(10).
+    Select("id", "name", "age")
 ```
 
-### ➕ INSERT操作
+### ➕ INSERT 操作
 
 ```go
-// 单行插入（使用字段值对）
+// 单行插入（字段值对）
 q := query.Table("users").Insert("name", "John", "age", 30)
 
-// 单行插入（使用map）
+// 使用 map 插入
 q := query.Table("users").Insert(map[string]any{"name": "John", "age": 30})
 
-// 多行插入
+// 批量插入
 q := query.Table("users").Insert(
     map[string]any{"name": "John", "age": 30},
     map[string]any{"name": "Jane", "age": 25},
 )
 ```
 
-### ✏️ UPDATE操作
+### ✏️ UPDATE 操作
 
 ```go
-// 更新单个字段
 q := query.Table("users").Where("id", 1).Update("name", "John")
 
-// 更新多个字段（使用map）
-q := query.Table("users").Where("id", 1).Update(map[string]any{"name": "John", "age": 30})
+// 更新多个字段
+q := query.Table("users").Where("id", 1).Update(map[string]any{
+    "name": "John",
+    "age":  30,
+})
 ```
 
-### 🗑️ DELETE操作
+### 🗑️ DELETE 操作
 
 ```go
-// 删除所有记录
-q := query.Table("users").Delete()
-
-// 带条件删除
 q := query.Table("users").Where("id", 1).Delete()
 ```
 
-## 🔍 WHERE条件
+## 🔍 WHERE 条件
 
-### 📋 基本条件
+### 流畅 API（推荐）
 
 ```go
 // 等于
-q.Where("name", "=", "John")
-q.Where("name", "John") // 简写形式
+q.Eq("name", "John")
 
 // 不等于
-q.Where("name", "<>", "John")
-q.Not("name", "John") // 简写形式
+q.Neq("status", "banned")
 
-// 大于
-q.Where("age", ">", 18)
+// 大于 / 大于等于
+q.Gt("age", 18)
+q.Gte("age", 18)
 
-// 小于
-q.Where("age", "<", 30)
-
-// 大于等于
-q.Where("age", ">=", 18)
-
-// 小于等于
-q.Where("age", "<=", 30)
+// 小于 / 小于等于
+q.Lt("age", 65)
+q.Lte("age", 65)
 
 // LIKE
-q.Where("name", "LIKE", "J%")
+q.Like("name", "%John%")
 
 // IN
-q.Where("id", []any{1, 2, 3, 4, 5})
+q.In("id", 1, 2, 3)
+q.In("id", []int{1, 2, 3})
 
-// NULL
-q.Where("email", nil)
-```
-
-### 🔗 逻辑组合
-
-```go
-// AND条件（默认）
-q.Where("age", ">", 18).Where("age", "<", 30)
-
-// OR条件
-q.Where("age", ">", 18).OrWhere("name", "admin")
-
-// NOT条件
-q.Where("age", ">", 18).Not("status", "banned")
-```
-
-## ORDER BY排序
-
-### 字符串形式
-
-```go
-// 单个字段升序
-q.OrderBy("name")
-
-// 单个字段降序
-q.OrderBy("age", "desc")
-
-// 多个字段排序
-q.OrderBy("age", "desc").OrderBy("name")
-
-// 逗号分隔的多个字段
-q.OrderBy("age desc, name asc")
-```
-
-### 结构化形式
-
-```go
-import "github.com/epkgs/query/clause"
-
-// 单个clause.OrderBy
-q.OrderBy(clause.OrderBy{Column: "name", Desc: false})
-
-// 多个clause.OrderBy参数
-q.OrderBy(
-    clause.OrderBy{Column: "age", Desc: true},
-    clause.OrderBy{Column: "name", Desc: false},
+// 逻辑组合
+query.Or(
+    query.Eq("status", "active"),
+    query.Eq("role", "admin"),
 )
 
-// []clause.OrderBy切片
-orderBys := []clause.OrderBy{
-    {Column: "age", Desc: true},
-    {Column: "name", Desc: false},
-}
-q.OrderBy(orderBys)
+query.And(
+    query.Gte("age", 18),
+    query.Lte("age", 65),
+)
 
-// clause.OrderBys集合
-orderBys := clause.OrderBys{
-    {Column: "age", Desc: true},
-    {Column: "name", Desc: false},
-}
-q.OrderBy(orderBys)
+query.Not(query.Eq("status", "deleted"))
 ```
 
-## 分页
+### 传统 API（兼容旧版本）
 
 ```go
-// 基本分页
+q.Where("name", "=", "John")
+q.Where("age", ">", 18)
+q.Where("status", "IN", []string{"active", "pending"})
+q.Where("email", nil)  // IS NULL
+q.Where("age", ">", 18).OrWhere("role", "admin")
+q.Not("status", "banned")
+```
+
+## 📊 ORDER BY 排序
+
+```go
+// 流畅 API
+q.Asc("name")
+q.Desc("age")
+q.Asc("name").Desc("created_at")
+
+// 传统 API
+q.OrderBy("name")
+q.OrderBy("age", "desc")
+q.OrderBy("age desc, name asc")
+
+// 结构化形式
+q.OrderBy(clause.OrderBy{Column: "name", Desc: false})
+```
+
+## 📄 分页
+
+```go
+// LIMIT 和 OFFSET
 q.Limit(10).Offset(20)
 
-// 使用Paginate方法（页码从1开始）
-q.Paginate(3, 10) // 第3页，每页10条
+// 基于页码的分页（页码从 1 开始）
+q.Paginate(3, 10)  // 第3页，每页10条
 ```
 
-## 构建SQL
+## 🔌 适配器架构
 
-查询构建完成后，可以通过`Build`方法将查询转换为SQL语句：
+Query 库采用适配器模式，核心包只构建抽象查询表达式。通过适配器，查询可以转换为不同 ORM 或数据源的查询条件。
+
+```
+┌─────────────┐     ┌───────────────────┐     ┌──────────────────┐
+│  AIP Filter │ ──→ │  clause.Where     │ ──→ │ GORM / Ent / SQL │
+│  AIP OrderBy│     │  clause.OrderBys  │     │ 查询              │
+└─────────────┘     └───────────────────┘     └──────────────────┘
+```
+
+### 🌐 AIP 适配器
+
+支持 Google API Improvement Proposals (AIP) 的过滤和排序语法转换。
 
 ```go
-type Builder interface {
-    WriteString(s string)
-    WriteQuoted(field any)
-    AddVar(writer clause.Writer, vars ...any)
-    AddError(err error)
+import (
+    query "github.com/epkgs/query"
+    aip "github.com/epkgs/query/adapter/aip"
+    filtering "go.einride.tech/aip/filtering"
+    ordering "go.einride.tech/aip/ordering"
+)
+
+// 定义可过滤的字段声明
+declarations, _ := filtering.NewDeclarations(
+    filtering.DeclareFunc("name", "string", func(ctx context.Context, value string, match func(filtering.Filter) error) error {
+        // ...
+        return nil
+    }),
+)
+
+// 解析 AIP 过滤条件 (如 filter=name="John" AND age>=18)
+filter, err := filtering.ParseFilter(filteringRequest, declarations)
+whereClause, err := aip.FromFilter(filter)
+
+// 解析 AIP 排序条件 (如 order_by=name desc, age asc)
+parsed, _ := ordering.ParseOrderBy(orderingRequest)
+orderBys := aip.FromOrderBy(parsed)
+```
+
+支持的 AIP 过滤运算符：`=` `!=` `>` `>=` `<` `<=` `IN` `NOT` `AND` `OR`
+
+### 🐬 GORM 适配器
+
+将查询转换为 GORM Scope 函数，可与 db.Scopes() 配合使用。
+
+```go
+import (
+    query "github.com/epkgs/query"
+    gormadapter "github.com/epkgs/query/adapter/gorm"
+    aip "github.com/epkgs/query/adapter/aip"
+    "gorm.io/gorm"
+)
+
+// 基本用法
+q := query.Table("users").
+    Eq("status", "active").
+    Gte("age", 18).
+    Asc("created_at").
+    Limit(10).
+    Select("id", "name", "age")
+
+db.Scopes(
+    gormadapter.Where(q.WhereExpr()),
+    gormadapter.OrderBy(q.OrderByExpr()),
+    gormadapter.Pagination(q.PaginationExpr()),
+).Find(&users)
+
+// 组合使用
+db.Scopes(gormadapter.Query(
+    q.WhereExpr(), q.OrderByExpr(), q.PaginationExpr(),
+)).Find(&users)
+
+// AIP 到 GORM 的完整示例
+filter, _ := filtering.ParseFilter(request, declarations)
+orderBy, _ := ordering.ParseOrderBy(orderingRequest)
+
+whereClause, _ := aip.FromFilter(filter)
+orderBys := aip.FromOrderBy(orderBy)
+
+db.Scopes(gormadapter.Query(whereClause, orderBys, clause.Pagination{
+    Limit:  &limit,
+    Offset: offset,
+})).Find(&users)
+```
+
+### 🔄 Ent 适配器
+
+将查询转换为 Ent 的 sql.Selector 修改函数，支持字段名映射。
+
+```go
+import (
+    query "github.com/epkgs/query"
+    entadapter "github.com/epkgs/query/adapter/ent"
+    aip "github.com/epkgs/query/adapter/aip"
+    "entgo.io/ent/dialect/sql"
+    "github.com/epkgs/query/clause"
+)
+
+// 基本用法
+q := query.Table("users").
+    Eq("status", "active").
+    Desc("created_at").
+    Select("id", "name")
+
+// 使用 ExprHandler 映射字段名（Ent schema 列名可能与 API 字段名不同）
+handler := func(expr clause.Expression) clause.Expression {
+    switch e := expr.(type) {
+    case clause.Eq:
+        e.Column = fieldMappings[e.Column]
+        return e
+    case clause.Like:
+        e.Column = fieldMappings[e.Column]
+        return e
+    }
+    return expr
 }
 
-// 自定义Builder实现
+orderHandler := func(ob clause.OrderBy) clause.OrderBy {
+    ob.Column = fieldMappings[ob.Column]
+    return ob
+}
+
+// 应用到 Ent 客户端查询
+client.User.Query().Modify(entadapter.Query(
+    q.WhereExpr(),
+    q.OrderByExpr(),
+    clause.Pagination{Limit: &limit, Offset: offset},
+    entadapter.WithExprHandler(handler),
+    entadapter.WithOrderByHandler(orderHandler),
+)).All(ctx)
+
+// AIP 到 Ent 的完整示例
+filter, _ := filtering.ParseFilter(request, declarations)
+whereClause, _ := aip.FromFilter(filter)
+orderBys := aip.FromOrderBy(parsedOrderBy)
+
+client.User.Query().Modify(entadapter.Query(
+    whereClause, orderBys, clause.Pagination{Limit: &limit},
+    entadapter.WithExprHandler(columnMapper),
+)).All(ctx)
+```
+
+### 📋 AIP → GORM/Ent 完整集成流程
+
+以下是典型的 gRPC/gRPC-Gateway 服务中使用 AIP 过滤和排序的完整流程：
+
+```go
+func ListUsers(ctx context.Context, db *gorm.DB, req *pb.ListUsersRequest) ([]User, error) {
+    var users []User
+
+    // 1. 定义 AIP 过滤声明
+    declarations, _ := filtering.NewDeclarations(
+        filtering.DeclareString("name"),
+        filtering.DeclareInt("age"),
+        filtering.DeclareString("status"),
+    )
+
+    // 2. 解析请求中的 filter 和 order_by 参数
+    filter, _ := filtering.ParseFilter(req.Filter, declarations)
+    orderBy, _ := ordering.ParseOrderBy(req.OrderBy)
+
+    // 3. 转换为 clause 格式
+    whereClause, _ := aip.FromFilter(filter)
+    orderBys := aip.FromOrderBy(orderBy)
+
+    // 4. 应用分页
+    pageSize := int(req.PageSize)
+    offset := int((req.Page - 1) * req.PageSize)
+
+    // 5. 使用 GORM 适配器执行查询
+    db.Model(&User{}).Scopes(gormadapter.Query(
+        whereClause, orderBys, clause.Pagination{
+            Limit:  &pageSize,
+            Offset: offset,
+        },
+    )).Find(&users)
+
+    return users, nil
+}
+```
+
+## 🛠️ 构建 SQL
+
+```go
+// 自定义 Builder 实现
+type MyBuilder struct {
+    strings.Builder
+    args []any
+}
+
+func (b *MyBuilder) WriteByte(c byte) error { b.Builder.WriteByte(c); return nil }
+func (b *MyBuilder) AddVar(_ clause.Writer, vars ...any) {
+    b.args = append(b.args, vars...)
+    b.Builder.WriteString("?")
+}
+func (b *MyBuilder) WriteQuoted(field any) { b.Builder.WriteString(field.(string)) }
+func (b *MyBuilder) AddError(err error) error { return err }
+
 q := query.Table("users").Where("name", "John").Select("id", "name")
-builder := &YourCustomBuilder{}
+builder := &MyBuilder{}
 q.Build(builder)
+fmt.Println(builder.String()) // SELECT id, name FROM users WHERE name = ?
+fmt.Println(builder.args)     // [John]
 ```
 
-## 错误处理
-
-查询构建过程中如果发生错误，会将错误赋值给 `Error` 属性。可以通过 `Error` 属性判断是否有错误发生：
+## ⚠️ 错误处理
 
 ```go
-q := query.Table("users").Where("invalid_field", "value").Select("id", "name")
-if err := q.Error; err != nil {
-    // 处理错误
+q := query.Table("users").Where("invalid", "value").Select("id")
+if q.Error != nil {
+    // 处理构建过程中的错误
+    log.Fatal(q.Error)
 }
 ```
 
-## 测试
+## 📂 项目结构
 
-运行测试：
+```
+query/
+├── clause/          # 底层抽象组件（Expression, Where, OrderBy, Pagination）
+├── adapter/
+│   ├── aip/         # AIP 过滤和排序适配器
+│   ├── gorm/        # GORM 适配器
+│   └── ent/         # Ent 适配器
+├── examples/
+│   ├── aip-to-gorm/ # AIP → GORM 端到端示例
+│   └── aip-to-ent/  # AIP → Ent 端到端示例
+├── query.go         # 核心 Query 类型和入口函数
+├── query_select.go  # SELECT 查询结构
+├── query_insert.go  # INSERT 查询结构
+├── query_update.go  # UPDATE 查询结构
+├── query_delete.go  # DELETE 查询结构
+├── component_*.go   # 可复用组件（where, orderbys, pagination）
+└── query_test.go    # 测试文件
+```
+
+## 🧪 测试
 
 ```bash
+# 运行所有测试
 go test ./...
+
+# 运行特定包的测试
+go test -v github.com/epkgs/query
+go test -v github.com/epkgs/query/adapter/aip
 ```
 
-## 示例
+## 📖 示例
 
-查看`examples`目录下的示例代码：
+查看 `examples` 目录下的完整端到端示例：
 
-- `examples/gorm` - GORM适配器示例
-- `examples/ent` - Ent适配器示例
+- `examples/aip-to-gorm/` - AIP 过滤 → clause → GORM 的完整集成示例
+- `examples/aip-to-ent/` - AIP 过滤 → clause → Ent 的完整集成示例
 
 ## 许可证
 
-MIT许可证
+MIT
 
 ## 贡献
 
-欢迎提交Issue和Pull Request！
-
-## 联系方式
-
-如有问题或建议，请提交Issue。
+欢迎提交 Issue 和 Pull Request！

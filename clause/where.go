@@ -2,13 +2,17 @@ package clause
 
 import "strings"
 
+// 连接字符串常量，用于 Build 时连接多个表达式。
 const (
 	AndWithSpace = " AND "
 	OrWithSpace  = " OR "
 )
 
+// Operator 表示 SQL 比较操作符。
+// 在 MapColumn 等方法中用于标识表达式类型。
 type Operator string
 
+// 支持的 SQL 比较操作符。
 const (
 	OpEQ   Operator = "="
 	OpNEQ  Operator = "!="
@@ -177,6 +181,9 @@ func (w Where) MapColumn(mapper func(column string, op Operator, value any) (str
 	})
 }
 
+// And 将多个表达式用 AND 逻辑组合。
+// 如果只有一个非 OrExpr 表达式，则直接返回该表达式（去掉多余的 AND 包裹）。
+// 如果只有一个 OrExpr 表达式，则仍用 AND 包裹以保持逻辑清晰。
 func And(exprs ...Expression) Expression {
 	if len(exprs) == 0 {
 		return nil
@@ -191,6 +198,8 @@ func And(exprs ...Expression) Expression {
 	return AndExpr{Exprs: exprs}
 }
 
+// AndExpr 表示 AND 逻辑组合表达式。
+// 多个子表达式之间用 AND 连接。
 type AndExpr struct {
 	Exprs []Expression
 }
@@ -205,6 +214,7 @@ func (and AndExpr) Build(builder Builder) {
 	}
 }
 
+// Or 将多个表达式用 OR 逻辑组合。
 func Or(exprs ...Expression) Expression {
 	if len(exprs) == 0 {
 		return nil
@@ -212,6 +222,8 @@ func Or(exprs ...Expression) Expression {
 	return OrExpr{Exprs: exprs}
 }
 
+// OrExpr 表示 OR 逻辑组合表达式。
+// 多个子表达式之间用 OR 连接。
 type OrExpr struct {
 	Exprs []Expression
 }
@@ -226,6 +238,10 @@ func (or OrExpr) Build(builder Builder) {
 	}
 }
 
+// Not 对表达式取反（NOT）。
+// 如果传入单个 AndExpr，会解开其内部的子表达式后取反。
+// 对于实现了 NegationExpressionBuilder 接口的表达式，
+// 在构建时会调用 NegationBuild 方法生成更自然的否定形式。
 func Not(exprs ...Expression) Expression {
 	if len(exprs) == 0 {
 		return nil
@@ -238,6 +254,8 @@ func Not(exprs ...Expression) Expression {
 	return NotExpr{Exprs: exprs}
 }
 
+// NotExpr 表示 NOT 取反表达式。
+// 构建时会优先使用 NegationExpressionBuilder 接口生成自然否定形式。
 type NotExpr struct {
 	Exprs []Expression
 }

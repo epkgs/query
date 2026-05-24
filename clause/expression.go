@@ -2,12 +2,17 @@ package clause
 
 import "reflect"
 
-// Expression expression interface
+// Expression 是查询表达式的抽象接口。
+// 所有查询组件（比较条件、逻辑组合、排序、分页等）都实现此接口，
+// 通过 Build 方法将自身写入 Builder。
 type Expression interface {
 	Build(builder Builder)
 }
 
-// NegationExpressionBuilder negation expression builder
+// NegationExpressionBuilder 表示支持否定构建的表达式。
+// 当表达式用于 NOT 上下文中时（如 NotExpr），
+// 如果表达式实现了此接口，则调用 NegationBuild 而非 Build，
+// 从而生成更自然的否定 SQL（例如将 = 转换为 <>）。
 type NegationExpressionBuilder interface {
 	NegationBuild(builder Builder)
 }

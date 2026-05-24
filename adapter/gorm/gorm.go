@@ -1,3 +1,32 @@
+// Package gorm 提供了将 query/clause 查询组件转换为 GORM Scope 函数的适配器。
+//
+// 该适配器将 clause.Where、clause.OrderBys、clause.Pagination 分别转换为
+// gorm.DB 的 Scope 函数（func(*gorm.DB) *gorm.DB），
+// 可直接用于 db.Scopes() 方法中。
+//
+// 使用方式：
+//
+//	q := query.Table("users").Where("age", ">", 18).Select("id", "name")
+//	db.Scopes(
+//	    gormadapter.Where(q.WhereExpr()),
+//	    gormadapter.OrderBy(q.OrderByExpr()),
+//	    gormadapter.Pagination(q.PaginationExpr()),
+//	).Find(&users)
+//
+// 组合使用：
+//
+//	db.Scopes(gormadapter.Query(q.WhereExpr(), q.OrderByExpr(), q.PaginationExpr())).Find(&users)
+//
+// 与 AIP 配合使用：
+//
+//	import (
+//	    aip "github.com/epkgs/query/adapter/aip"
+//	    gorm "github.com/epkgs/query/adapter/gorm"
+//	)
+//	filter, _ := filtering.ParseFilter(request, declarations)
+//	whereClause, _ := aip.FromFilter(filter)
+//	orderBys := aip.FromOrderBy(parsedOrderBy)
+//	db.Scopes(gorm.Query(whereClause, orderBys, clause.Pagination{})).Find(&users)
 package gorm
 
 import (
@@ -6,7 +35,9 @@ import (
 	gormClause "gorm.io/gorm/clause"
 )
 
-// Where 将 clause.Where 转换为 gorm scope
+// Where 将 clause.Where 转换为 GORM Scope 函数。
+// 返回的函数可直接传入 db.Scopes() 或 db.Where() 使用。
+// 如果 where 没有表达式，返回空操作的 Scope。
 func Where(where clause.Where) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
@@ -105,7 +136,7 @@ func convertExpr(expr clause.Expression) gormClause.Expression {
 	}
 }
 
-// OrderBy 将 clause.OrderBys 转换为 gorm scope
+// OrderBy 将 clause.OrderBys 转换为 GORM Scope 函数，用于设置排序条件。
 func OrderBy(orders clause.OrderBys) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
@@ -134,7 +165,7 @@ func OrderBy(orders clause.OrderBys) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-// Pagination 将 clause.Pagination 转换为 gorm scope
+// Pagination 将 clause.Pagination 转换为 GORM Scope 函数，用于设置 LIMIT 和 OFFSET。
 func Pagination(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 
@@ -147,7 +178,8 @@ func Pagination(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-// Query 将多个查询组件转换为 gorm scope
+// Query 将 WHERE、ORDER BY 和分页三个查询组件一次性转换为 GORM Scope 函数。
+// 这是 Where、OrderBy、Pagination 三个函数的便捷组合。
 func Query(where clause.Where, orders clause.OrderBys, pagination clause.Pagination) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		db = Where(where)(db)

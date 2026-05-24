@@ -9,6 +9,9 @@ type genericPaginator[Q any] interface {
 	Paginate(page int, pageSize int) Q
 }
 
+// Pagination 是用户可见的分页参数。
+// 可通过 Limit、Offset 或 Paginate 方法设置。
+// 内部会转换为 clause.Pagination 用于 SQL 构建。
 type Pagination struct {
 	Offset int
 	Limit  int

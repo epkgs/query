@@ -2,7 +2,8 @@ package query
 
 import "github.com/epkgs/query/clause"
 
-// DeleteQuery DELETE查询结构体
+// DeleteQuery 是 DELETE 查询结构体。
+// 包含表名和 WHERE 条件，通过 Build 方法将完整的 DELETE 语句写入 Builder。
 type DeleteQuery struct {
 	table string
 	errorRecord

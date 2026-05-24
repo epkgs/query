@@ -2,7 +2,8 @@ package query
 
 import "github.com/epkgs/query/clause"
 
-// InsertQuery SELECT查询结构体
+// InsertQuery 是 INSERT 查询结构体。
+// 包含表名和要插入的数据行，通过 Build 方法可将查询写入 Builder。
 type InsertQuery struct {
 	table string
 	errorRecord
