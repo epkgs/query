@@ -11,7 +11,7 @@ type genericWherer[Q any] interface {
 	Where(field any, args ...any) Q
 	OrWhere(field any, args ...any) Q
 	NotWhere(field any, args ...any) Q
-	And(querys ...Q) Q
+	And(querys ...Wherer) Q
 	Eq(column string, value any) Q
 	Gt(column string, value any) Q
 	Gte(column string, value any) Q
@@ -20,8 +20,8 @@ type genericWherer[Q any] interface {
 	Lt(column string, value any) Q
 	Lte(column string, value any) Q
 	Neq(column string, value any) Q
-	Not(query Q) Q
-	Or(querys ...Q) Q
+	Not(query Wherer) Q
+	Or(querys ...Wherer) Q
 }
 
 var _ genericWherer[*Query] = (*where[*Query])(nil)
@@ -31,12 +31,12 @@ type whereExprExporter interface {
 	WhereExpr() clause.Where
 }
 
-type whereQuerier interface {
+type Wherer interface {
 	errorRecorder
 	whereExprExporter
 }
 
-type where[Q whereQuerier] struct {
+type where[Q Wherer] struct {
 	Parent Q
 	Value  clause.Where
 }
@@ -254,7 +254,7 @@ func toAnySlice(value any) []any {
 //
 // 示例:
 //   - Or(Eq("name", "John"), Eq("name", "Jane"))
-func (w *where[Q]) Or(qs ...*Query) Q {
+func (w *where[Q]) Or(qs ...Wherer) Q {
 
 	if len(qs) == 0 {
 		return w.Parent
@@ -299,7 +299,7 @@ func (w *where[Q]) Or(qs ...*Query) Q {
 //
 // 示例:
 //   - And(Eq("name", "John"), Gte("age", 18))
-func (w *where[Q]) And(qs ...*Query) Q {
+func (w *where[Q]) And(qs ...Wherer) Q {
 
 	if len(qs) == 0 {
 		return w.Parent
@@ -342,7 +342,7 @@ func (w *where[Q]) And(qs ...*Query) Q {
 //
 // 示例:
 //   - Not(Eq("city", "London"))
-func (w *where[Q]) Not(q *Query) Q {
+func (w *where[Q]) Not(q Wherer) Q {
 
 	if q == nil {
 		return w.Parent
@@ -421,17 +421,17 @@ func (w *where[Q]) In(column string, values ...any) Q {
 // ========== 全局逻辑组合函数 ==========
 
 // Or 组合多个 WHERE 条件为 OR
-func Or(querys ...*Query) *Query {
+func Or(querys ...Wherer) *Query {
 	return newQuery("").Or(querys...)
 }
 
 // And 组合多个 WHERE 条件为 AND
-func And(querys ...*Query) *Query {
+func And(querys ...Wherer) *Query {
 	return newQuery("").And(querys...)
 }
 
 // Not 对 WHERE 条件取反
-func Not(query *Query) *Query {
+func Not(query Wherer) *Query {
 	return newQuery("").Not(query)
 }
 
