@@ -254,22 +254,26 @@ func toAnySlice(value any) []any {
 //
 // 示例:
 //   - Or(Eq("name", "John"), Eq("name", "Jane"))
-func (w *where[Q]) Or(querys ...Q) Q {
+func (w *where[Q]) Or(qs ...*Query) Q {
 
-	if len(querys) == 0 {
+	if len(qs) == 0 {
 		return w.Parent
 	}
 
 	// 提取所有 where 表达式，内部使用 AND 组合
-	exprs := make([]clause.Expression, 0, len(querys))
-	for _, query := range querys {
+	exprs := make([]clause.Expression, 0, len(qs))
+	for _, q := range qs {
 
-		if err := query.getError(); err != nil {
+		if q == nil {
+			continue
+		}
+
+		if err := q.getError(); err != nil {
 			w.Parent.setError(err)
 			return w.Parent
 		}
 
-		qs := query.WhereExpr()
+		qs := q.WhereExpr()
 		if len(qs.Exprs) > 0 {
 			var expr clause.Expression
 			if len(qs.Exprs) == 1 {
@@ -295,22 +299,26 @@ func (w *where[Q]) Or(querys ...Q) Q {
 //
 // 示例:
 //   - And(Eq("name", "John"), Gte("age", 18))
-func (w *where[Q]) And(querys ...Q) Q {
+func (w *where[Q]) And(qs ...*Query) Q {
 
-	if len(querys) == 0 {
+	if len(qs) == 0 {
 		return w.Parent
 	}
 
 	// 提取所有 where 表达式
 	exprs := make([]clause.Expression, 0)
-	for _, query := range querys {
+	for _, q := range qs {
 
-		if err := query.getError(); err != nil {
+		if q == nil {
+			continue
+		}
+
+		if err := q.getError(); err != nil {
 			w.Parent.setError(err)
 			return w.Parent
 		}
 
-		qs := query.WhereExpr()
+		qs := q.WhereExpr()
 		if len(qs.Exprs) > 0 {
 			var expr clause.Expression
 			if len(qs.Exprs) == 1 {
@@ -334,14 +342,18 @@ func (w *where[Q]) And(querys ...Q) Q {
 //
 // 示例:
 //   - Not(Eq("city", "London"))
-func (w *where[Q]) Not(query Q) Q {
+func (w *where[Q]) Not(q *Query) Q {
 
-	if err := query.getError(); err != nil {
+	if q == nil {
+		return w.Parent
+	}
+
+	if err := q.getError(); err != nil {
 		w.Parent.setError(err)
 		return w.Parent
 	}
 
-	qs := query.WhereExpr()
+	qs := q.WhereExpr()
 	if len(qs.Exprs) > 0 {
 		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Not(qs.Exprs...)}})
 	}
