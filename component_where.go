@@ -48,7 +48,7 @@ func (w *where[Q]) WhereExpr() clause.Where {
 
 // Where 添加WHERE条件到当前查询
 //
-// Deprecated: 使用 Eq, Neq, Gt 等方法替代，例如：q.Eq("name", "John")
+// 建议使用 Eq, Neq, Gt 等方法替代，例如：q.Eq("name", "John")
 //
 // 参数:
 //   - field: 字段名、表达式或表达式数组
@@ -74,7 +74,7 @@ func (w *where[Q]) Where(field any, args ...any) Q {
 
 // OrWhere 添加OR WHERE条件到当前查询
 //
-// Deprecated: 使用 Or() 函数替代，例如：Or(q.Eq("name", "John"), q.Eq("name", "Jane"))
+// 建议使用 Or() 函数替代，例如：Or(q.Eq("name", "John"), q.Eq("name", "Jane"))
 //
 // 参数:
 //   - field: 字段名、表达式或表达式数组
@@ -102,7 +102,7 @@ func (w *where[Q]) OrWhere(field any, args ...any) Q {
 
 // Not 添加NOT条件到当前查询
 //
-// Deprecated: 使用 Not() 函数替代，例如：Not(q.Eq("name", "John"))
+// 建议使用 Not() 函数替代，例如：Not(q.Eq("name", "John"))
 //
 // 参数:
 //   - field: 字段名、表达式或表达式数组

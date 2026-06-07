@@ -108,7 +108,7 @@ func Table(tableName string) *Query {
 
 // Where 添加WHERE条件到当前查询
 //
-// Deprecated: 使用 Eq, Neq, Gt 等方法替代，例如：q.Eq("name", "John")
+// 建议使用 Eq, Neq, Gt 等方法替代，例如：q.Eq("name", "John")
 //
 // 参数:
 //   - field: 字段名、表达式或表达式数组
@@ -128,7 +128,7 @@ func Where(field any, args ...any) *Query {
 
 // OrWhere 添加OR WHERE条件到当前查询
 //
-// Deprecated: 使用 Or 方法替代，例如：q.Or("name", "John")
+// 建议使用 Or 方法替代，例如：q.Or("name", "John")
 //
 // 参数:
 //   - field: 字段名、表达式或表达式数组
