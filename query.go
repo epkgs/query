@@ -33,7 +33,7 @@
 //
 //	filter, _ := aipfilter.ParseFilter(request, declarations)
 //	whereClause, _ := aipadapter.FromFilter(filter)
-//	db.Scopes(gormadapter.Where(whereClause)).Find(&users)
+//	db.Scopes(gormadapter.WhereScope(whereClause)).Find(&users)
 package query
 
 import (

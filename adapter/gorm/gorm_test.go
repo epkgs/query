@@ -42,7 +42,7 @@ func TestWhereScope(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -87,7 +87,7 @@ func TestWhereScope_Empty(t *testing.T) {
 	where := clause.Where{}
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -114,7 +114,7 @@ func TestOrderByScope(t *testing.T) {
 	orders = append(orders, &clause.OrderBy{Column: "age", Desc: true})
 
 	// 转换为 gorm scope
-	scope := OrderBy(orders)
+	scope := OrderByScope(orders)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -145,7 +145,7 @@ func TestOrderByScope_Empty(t *testing.T) {
 	var orders clause.OrderBys
 
 	// 转换为 gorm scope
-	scope := OrderBy(orders)
+	scope := OrderByScope(orders)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -174,7 +174,7 @@ func TestPaginationScope(t *testing.T) {
 	}
 
 	// 转换为 gorm scope
-	scope := Pagination(pagination)
+	scope := PaginationScope(pagination)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -206,7 +206,7 @@ func TestPaginationScope_LimitOnly(t *testing.T) {
 	}
 
 	// 转换为 gorm scope
-	scope := Pagination(pagination)
+	scope := PaginationScope(pagination)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -244,7 +244,7 @@ func TestQueryScope(t *testing.T) {
 	}
 
 	// 转换为 gorm scope
-	scope := Query(where, orders, pagination)
+	scope := QueryScope(where, orders, pagination)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -289,7 +289,7 @@ func TestOrScope(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -327,7 +327,7 @@ func TestNotWhereScope(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -370,7 +370,7 @@ func TestInWhereScope(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -412,7 +412,7 @@ func TestLikeWhereScope(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -466,7 +466,7 @@ func TestComparisonOperators(t *testing.T) {
 			where := q.WhereExpr()
 
 			// 转换为 gorm scope
-			scope := Where(where)
+			scope := WhereScope(where)
 
 			// 创建 gorm DB 实例
 			db := getTestDB(t)
@@ -490,15 +490,17 @@ func TestComparisonOperators(t *testing.T) {
 func TestWithExprHandler(t *testing.T) {
 	// 创建查询条件
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.WhereExpr().MapColumn(func(column string, op clause.Operator, value any) (string, any) {
-		if column == "age" {
-			return "", value // 过滤掉 age 条件
+	where := q.WhereExpr().Map(func(e clause.Expression, c *clause.Condition) clause.Expression {
+		if c != nil {
+			if c.Column == "age" {
+				return nil // 过滤掉 age 条件
+			}
 		}
-		return column, value
+		return e
 	})
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -532,15 +534,15 @@ func TestWithOrderByHandler(t *testing.T) {
 	// 创建 OrderBy 条件
 	q := query.OrderBy(clause.OrderBy{Column: "name", Desc: false}).OrderBy(clause.OrderBy{Column: "age", Desc: true})
 
-	orders := q.OrderByExpr().MapColumn(func(column string, desc bool) (string, bool) {
-		if column == "name" {
-			column = "user_name" // 修改列名
+	orders := q.OrderByExpr().Map(func(o clause.OrderBy) *clause.OrderBy {
+		if o.Column == "name" {
+			o.Column = "user_name" // 修改列名
 		}
-		return column, desc
+		return &o
 	})
 
 	// 转换为 gorm scope
-	scope := OrderBy(orders)
+	scope := OrderByScope(orders)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -575,7 +577,7 @@ func TestComplexNestedConditions(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -608,7 +610,7 @@ func TestMixedConditions(t *testing.T) {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 创建 gorm DB 实例
 	db := getTestDB(t)
@@ -647,7 +649,7 @@ func BenchmarkWhereScope(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scope := Where(where)
+		scope := WhereScope(where)
 		scope(db)
 	}
 }
@@ -667,7 +669,7 @@ func BenchmarkQueryScope(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scope := Query(where, orders, pagination)
+		scope := QueryScope(where, orders, pagination)
 		scope(db)
 	}
 }
@@ -679,7 +681,7 @@ func ExampleWhere() {
 	where := q.WhereExpr()
 
 	// 转换为 gorm scope
-	scope := Where(where)
+	scope := WhereScope(where)
 
 	// 在实际使用中应用
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{

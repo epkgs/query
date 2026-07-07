@@ -152,13 +152,13 @@ func Example_aipToGorm() {
 
 	// Apply to GORM query:
 	// db.Model(&User{}).Scopes(
-	//     gormadapter.Where(whereClause),
-	//     gormadapter.OrderBy(orderBys),
-	//     gormadapter.Pagination(clause.Pagination{Limit: &limit, Offset: offset}),
+	//     gormadapter.WhereScope(whereClause),
+	//     gormadapter.OrderByScope(orderBys),
+	//     gormadapter.PaginationScope(clause.Pagination{Limit: &limit, Offset: offset}),
 	// ).Find(&users)
 
-	// Alternatively, use the combined Query function:
-	// db.Scopes(gormadapter.Query(whereClause, orderBys, clause.Pagination{Limit: &limit})).Find(&users)
+	// Alternatively, use the combined QueryScope function:
+	// db.Scopes(gormadapter.QueryScope(whereClause, orderBys, clause.Pagination{Limit: &limit})).Find(&users)
 
 	fmt.Println("AIP → GORM integration ready")
 	// Output: AIP → GORM integration ready

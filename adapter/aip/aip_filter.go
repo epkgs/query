@@ -17,7 +17,7 @@
 //	orderBys := aip.FromOrderBy(orderBy)
 //
 //	// 3. 通过 GORM/Ent 适配器应用到 ORM 查询
-//	db.Scopes(gormadapter.Query(whereClause, orderBys, clause.Pagination{})).Find(&users)
+//	db.Scopes(gormadapter.QueryScope(whereClause, orderBys, clause.Pagination{})).Find(&users)
 package aip
 
 import (

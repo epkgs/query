@@ -47,7 +47,7 @@ func main() {
     // 转换为 GORM scope 并执行查询
     var users []User
     err = db.Model(&User{}).
-        Scopes(adapter.Query(
+        Scopes(adapter.QueryScope(
             q.WhereExpr(),
             q.OrderByExpr(),
             q.PaginationExpr(),
@@ -58,12 +58,12 @@ func main() {
 
 ## 📚 API 文档
 
-### Where
+### WhereScope
 
-将 `clause.Where` 转换为 GORM 的 WHERE 条件。
+将 `clause.Where` 转换为 GORM 的 WHERE 条件 Scope 函数。
 
 ```go
-func Where(where clause.Where, opts ...Option) func(db *gorm.DB) *gorm.DB
+func WhereScope(where clause.Where, convs ...WhereConverter) func(db *gorm.DB) *gorm.DB
 ```
 
 **示例：**
@@ -73,16 +73,24 @@ q := query.Where("name", "John").Where("age", ">", 18)
 whereClause := q.WhereExpr()
 
 db.Model(&User{}).
-    Scopes(adapter.Where(whereClause)).
+    Scopes(adapter.WhereScope(whereClause)).
     Find(&users)
 ```
 
-### OrderBy
+### WhereExpr
 
-将 `clause.OrderBys` 转换为 GORM 的 ORDER BY 子句。
+将 `clause.Where` 转换为 GORM 的 `clause.Where` 表达式，可直接传入 `db.Where()` 或组合使用。
 
 ```go
-func OrderBy(orders clause.OrderBys, opts ...Option) func(db *gorm.DB) *gorm.DB
+func WhereExpr(where clause.Where, convs ...WhereConverter) gormClause.Expression
+```
+
+### OrderByScope
+
+将 `clause.OrderBys` 转换为 GORM 的 ORDER BY 子句 Scope 函数。
+
+```go
+func OrderByScope(orders clause.OrderBys, convs ...OrderByConverter) func(db *gorm.DB) *gorm.DB
 ```
 
 **示例：**
@@ -92,16 +100,24 @@ q := query.Table("users").OrderBy("age", "desc").OrderBy("name")
 orderBys := q.OrderByExpr()
 
 db.Model(&User{}).
-    Scopes(adapter.OrderBy(orderBys)).
+    Scopes(adapter.OrderByScope(orderBys)).
     Find(&users)
 ```
 
-### Pagination
+### OrderByExpr
 
-将 `clause.Pagination` 转换为 GORM 的 LIMIT/OFFSET 子句。
+将 `clause.OrderBys` 转换为 GORM 的 `clause.OrderBy` 表达式。
 
 ```go
-func Pagination(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB
+func OrderByExpr(orders clause.OrderBys, convs ...OrderByConverter) gormClause.OrderBy
+```
+
+### PaginationScope
+
+将 `clause.Pagination` 转换为 GORM 的 LIMIT/OFFSET 子句 Scope 函数。
+
+```go
+func PaginationScope(pagination clause.Pagination) func(db *gorm.DB) *gorm.DB
 ```
 
 **示例：**
@@ -111,16 +127,16 @@ q := query.Table("users").Limit(10).Offset(20)
 pagination := q.PaginationExpr()
 
 db.Model(&User{}).
-    Scopes(adapter.Pagination(pagination)).
+    Scopes(adapter.PaginationScope(pagination)).
     Find(&users)
 ```
 
-### Query
+### QueryScope
 
-组合 WHERE、ORDER BY 和 PAGINATION 三个条件。
+组合 WHERE、ORDER BY 和 PAGINATION 三个条件，是 WhereScope、OrderByScope、PaginationScope 的便捷组合。
 
 ```go
-func Query(where clause.Where, orders clause.OrderBys, pagination clause.Pagination, opts ...Option) func(db *gorm.DB) *gorm.DB
+func QueryScope(where clause.Where, orders clause.OrderBys, pagination clause.Pagination) func(db *gorm.DB) *gorm.DB
 ```
 
 **示例：**
@@ -132,7 +148,7 @@ q := query.Table("users").
     Limit(10)
 
 db.Model(&User{}).
-    Scopes(adapter.Query(
+    Scopes(adapter.QueryScope(
         q.WhereExpr(),
         q.OrderByExpr(),
         q.PaginationExpr(),
@@ -142,74 +158,70 @@ db.Model(&User{}).
 
 ## 🔧 高级特性
 
-### ExprHandler - 表达式处理器
+### WhereConverter - 表达式转换器
 
-在转换为 GORM 表达式前预处理 `clause.Expression`，可用于自定义字段映射、条件过滤等。
+在转换为 GORM 表达式时，可通过 `WhereConverter` 自定义转换逻辑。若转换成功（`converted` 为 `true`），使用自定义结果；否则由默认逻辑处理。可用于自定义字段映射、条件过滤等。
 
 ```go
-type ExprHandler func(expr clause.Expression) clause.Expression
+type WhereConverter func(e clause.Expression, c *clause.Condition) (gormExpr gormClause.Expression, converted bool)
 ```
 
 **示例：字段名映射**
 
 ```go
-handler := func(expr clause.Expression) clause.Expression {
-    switch e := expr.(type) {
-    case clause.Eq:
+columnMapper := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
+    if c != nil && c.Column == "user_name" {
         // 将 API 中的 user_name 映射到数据库的 name
-        if e.Column == "user_name" {
-            e.Column = "name"
-        }
-        return e
+        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: c.Value}, true
     }
-    return expr
+    return nil, false
 }
 
 db.Model(&User{}).
-    Scopes(adapter.Where(whereClause, adapter.WithExprHandler(handler))).
+    Scopes(adapter.WhereScope(whereClause, columnMapper)).
     Find(&users)
 ```
 
 **示例：条件过滤**
 
 ```go
-handler := func(expr clause.Expression) clause.Expression {
-    switch e := expr.(type) {
-    case clause.Eq:
-        // 过滤掉某些字段
-        if e.Column == "internal_field" {
-            return nil
-        }
+filter := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
+    if c != nil && c.Column == "internal_field" {
+        // 过滤掉 internal_field 条件，返回 nil 表示不生成任何 GORM 表达式
+        return nil, true
     }
-    return expr
+    return nil, false // 返回 false 表示由默认逻辑处理
 }
 
 db.Model(&User{}).
-    Scopes(adapter.Where(whereClause, adapter.WithExprHandler(handler))).
+    Scopes(adapter.WhereScope(whereClause, filter)).
     Find(&users)
 ```
 
-### OrderByHandler - 排序处理器
+### OrderByConverter - 排序转换器
 
-在转换为 GORM 排序表达式前预处理 `clause.OrderBy`，可用于字段映射、自定义排序逻辑等。
+在转换为 GORM 排序表达式时，可通过 `OrderByConverter` 自定义转换逻辑。若转换成功（`converted` 为 `true`），使用自定义结果；否则由默认逻辑处理。可用于字段映射、自定义排序逻辑等。
 
 ```go
-type OrderHandler func(expr clause.OrderBy) clause.OrderBy
+type OrderByConverter func(o clause.OrderBy) (gormOrder gormClause.OrderByColumn, converted bool)
 ```
 
 **示例：字段名映射**
 
 ```go
-handler := func(order clause.OrderBy) clause.OrderBy {
+orderMapper := func(o clause.OrderBy) (gormClause.OrderByColumn, bool) {
     // 将 API 中的 user_name 映射到数据库的 name
-    if order.Column == "user_name" {
-        order.Column = "name"
+    if o.Column == "user_name" {
+        return gormClause.OrderByColumn{
+            Column: gormClause.Column{Name: "name"},
+            Desc:   o.Desc,
+        }, true
     }
-    return order
+    return gormClause.OrderByColumn{}, false
 }
 
 db.Model(&User{}).
-    Scopes(adapter.OrderBy(orderBys, adapter.WithOrderByHandler(handler))).
+    Scopes(adapter.OrderByScope(orderBys, orderMapper)).
     Find(&users)
 ```
 
@@ -255,7 +267,7 @@ q := query.Table("users").
     })
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.WhereExpr())).
+    Scopes(adapter.WhereScope(q.WhereExpr())).
     Find(&users)
 ```
 
@@ -268,7 +280,7 @@ q := query.Table("users").
     Not("age", ">", 65)
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.WhereExpr())).
+    Scopes(adapter.WhereScope(q.WhereExpr())).
     Find(&users)
 
 // GORM 会将 NOT 转换为反向操作符：
@@ -281,7 +293,7 @@ db.Model(&User{}).
 q := query.Where("id", "IN", []interface{}{1, 2, 3, 4, 5})
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.WhereExpr())).
+    Scopes(adapter.WhereScope(q.WhereExpr())).
     Find(&users)
 
 // 生成: WHERE `id` IN (?,?,?,?,?)
@@ -293,7 +305,7 @@ db.Model(&User{}).
 q := query.Where("name", "LIKE", "%John%")
 
 db.Model(&User{}).
-    Scopes(adapter.Where(q.WhereExpr())).
+    Scopes(adapter.WhereScope(q.WhereExpr())).
     Find(&users)
 
 // 生成: WHERE `name` LIKE ?
@@ -302,7 +314,7 @@ db.Model(&User{}).
 ### 组合使用
 
 ```go
-// 完整示例：WHERE + ORDER BY + PAGINATION + Handler
+// 完整示例：WHERE + ORDER BY + PAGINATION + Converter
 q := query.Table("users").
     Where("age", ">", 18).
     Where("city", "New York").
@@ -311,36 +323,40 @@ q := query.Table("users").
     Limit(10).
     Offset(20)
 
-// 字段映射 handler
-exprHandler := func(expr clause.Expression) clause.Expression {
-    switch e := expr.(type) {
-    case clause.Eq:
-        if e.Column == "user_name" {
-            e.Column = "name"
-        }
-        return e
+// 字段映射 converter
+columnMapper := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
+    if c != nil && c.Column == "user_name" {
+        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: c.Value}, true
     }
-    return expr
+    return nil, false
 }
 
-orderHandler := func(order clause.OrderBy) clause.OrderBy {
-    if order.Column == "user_name" {
-        order.Column = "name"
+orderMapper := func(o clause.OrderBy) (gormClause.OrderByColumn, bool) {
+    if o.Column == "user_name" {
+        return gormClause.OrderByColumn{
+            Column: gormClause.Column{Name: "name"},
+            Desc:   o.Desc,
+        }, true
     }
-    return order
+    return gormClause.OrderByColumn{}, false
 }
 
 // 执行查询
 var users []User
 err := db.Model(&User{}).
-    Scopes(adapter.Query(
+    Scopes(adapter.QueryScope(
         q.WhereExpr(),
         q.OrderByExpr(),
         q.PaginationExpr(),
-        adapter.WithExprHandler(exprHandler),
-        adapter.WithOrderByHandler(orderHandler),
-    )).
-    Find(&users).Error
+    )).Find(&users).Error
+
+// 或使用单独的 Scope 函数并传入 Converter：
+err = db.Model(&User{}).
+    Scopes(
+        adapter.WhereScope(q.WhereExpr(), columnMapper),
+        adapter.OrderByScope(q.OrderByExpr(), orderMapper),
+        adapter.PaginationScope(q.PaginationExpr()),
+    ).Find(&users).Error
 ```
 
 ## 🧪 测试

@@ -220,13 +220,13 @@ q := query.Table("users").
     Select("id", "name", "age")
 
 db.Scopes(
-    gormadapter.Where(q.WhereExpr()),
-    gormadapter.OrderBy(q.OrderByExpr()),
-    gormadapter.Pagination(q.PaginationExpr()),
+    gormadapter.WhereScope(q.WhereExpr()),
+    gormadapter.OrderByScope(q.OrderByExpr()),
+    gormadapter.PaginationScope(q.PaginationExpr()),
 ).Find(&users)
 
 // 组合使用
-db.Scopes(gormadapter.Query(
+db.Scopes(gormadapter.QueryScope(
     q.WhereExpr(), q.OrderByExpr(), q.PaginationExpr(),
 )).Find(&users)
 
@@ -328,7 +328,7 @@ func ListUsers(ctx context.Context, db *gorm.DB, req *pb.ListUsersRequest) ([]Us
     offset := int((req.Page - 1) * req.PageSize)
 
     // 5. 使用 GORM 适配器执行查询
-    db.Model(&User{}).Scopes(gormadapter.Query(
+    db.Model(&User{}).Scopes(gormadapter.QueryScope(
         whereClause, orderBys, clause.Pagination{
             Limit:  &pageSize,
             Offset: offset,
