@@ -78,6 +78,25 @@ func WhereExpr(expr clause.Expression, convs ...WhereConverter) gormClause.Expre
 	return convertExpr(expr)
 }
 
+// WhereExprs 批量将 clause.Expression 列表转换为 GORM 的 Expression 列表。
+// 转换过程中会跳过 nil 以及转换结果为 nil 的表达式。
+//
+// 可传入 WhereConverter 对特定表达式进行自定义转换，规则同 WhereExpr。
+func WhereExprs(exprs []clause.Expression, convs ...WhereConverter) []gormClause.Expression {
+	gormExprs := make([]gormClause.Expression, 0, len(exprs))
+
+	for _, expr := range exprs {
+		if expr == nil {
+			continue
+		}
+		e := WhereExpr(expr, convs...)
+		if e != nil {
+			gormExprs = append(gormExprs, e)
+		}
+	}
+	return gormExprs
+}
+
 // WhereScope 将 clause.Where 转换为 GORM Scope 函数。
 // 返回的函数可直接传入 db.Scopes() 或 db.Where() 使用。
 // 如果 where 没有表达式，返回空操作的 Scope。
@@ -86,20 +105,13 @@ func WhereExpr(expr clause.Expression, convs ...WhereConverter) gormClause.Expre
 func WhereScope(where clause.Where, convs ...WhereConverter) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
-		gormExprs := make([]gormClause.Expression, 0, len(where.Exprs))
+		exprs := WhereExprs(where.Exprs, convs...)
 
-		for _, expr := range where.Exprs {
-			e := WhereExpr(expr, convs...)
-			if e != nil {
-				gormExprs = append(gormExprs, e)
-			}
-		}
-
-		if len(gormExprs) == 0 {
+		if len(exprs) == 0 {
 			return db
 		}
 
-		return db.Where(gormClause.Where{Exprs: gormExprs})
+		return db.Where(gormClause.Where{Exprs: exprs})
 	}
 }
 
@@ -192,23 +204,32 @@ func OrderByExpr(order clause.OrderBy, convs ...OrderByConverter) gormClause.Ord
 	return col
 }
 
+// OrderByExprs 批量将 clause.OrderBys 转换为 GORM 的 OrderByColumn 列表。
+// 转换过程中会跳过 nil 以及列名为空的表达式。
+//
+// 可传入 OrderByConverter 对特定排序条件进行自定义转换，规则同 OrderByExpr。
+func OrderByExprs(orders clause.OrderBys, convs ...OrderByConverter) []gormClause.OrderByColumn {
+	cols := make([]gormClause.OrderByColumn, 0, len(orders))
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		if order.Column == "" {
+			continue
+		}
+		cols = append(cols, OrderByExpr(*order, convs...))
+	}
+
+	return cols
+}
+
 // OrderByScope 将 clause.OrderBys 转换为 GORM Scope 函数，用于设置排序条件。
 //
 // 可传入 OrderByConverter 对特定排序条件进行自定义转换。
 func OrderByScope(orders clause.OrderBys, convs ...OrderByConverter) func(db *gorm.DB) *gorm.DB {
 
 	return func(db *gorm.DB) *gorm.DB {
-		cols := []gormClause.OrderByColumn{}
-		for _, order := range orders {
-			if order == nil {
-				continue
-			}
-			if order.Column == "" {
-				continue
-			}
-
-			cols = append(cols, OrderByExpr(*order, convs...))
-		}
+		cols := OrderByExprs(orders, convs...)
 
 		if len(cols) > 0 {
 			return db.Order(gormClause.OrderBy{Columns: cols})
