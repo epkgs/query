@@ -1,7 +1,5 @@
 package clause
 
-import "strings"
-
 // 连接字符串常量，用于 Build 时连接多个表达式。
 const (
 	AndWithSpace = " AND "
@@ -53,137 +51,6 @@ func (w *Where) Merge(where Where) *Where {
 	return w
 }
 
-// Map 遍历表达式列表，并生成新的表达式列表
-//
-// mapper 为表达式遍历函数，返回 nil 表示移除该表达式
-func (w Where) Map(mapper func(expr Expression) Expression) Where {
-	exprs := mapExpressions(w.Exprs, mapper)
-	return Where{Exprs: exprs}
-}
-
-func mapExpressions(exprs []Expression, walkers ...func(Expression) Expression) []Expression {
-
-	copied := make([]Expression, len(exprs))
-	copy(copied, exprs)
-
-	if len(walkers) == 0 {
-		return copied
-	}
-
-	result := []Expression{}
-	for _, exp := range copied {
-		switch e := exp.(type) {
-		case AndExpr:
-			e.Exprs = mapExpressions(e.Exprs, walkers...)
-			result = append(result, e)
-
-		case OrExpr:
-			e.Exprs = mapExpressions(e.Exprs, walkers...)
-			result = append(result, e)
-
-		case NotExpr:
-			e.Exprs = mapExpressions(e.Exprs, walkers...)
-			result = append(result, e)
-
-		default:
-
-			for _, walk := range walkers {
-				if walk == nil {
-					continue
-				}
-				if e == nil {
-					break
-				}
-				e = walk(e)
-			}
-
-			if e != nil {
-				result = append(result, e)
-			}
-		}
-
-	}
-	return result
-}
-
-// MapColumn 遍历表达式列表，并生成新的表达式列表
-//
-// mapper 为表达式遍历函数，返回空字符串表示移除该表达式
-func (w Where) MapColumn(mapper func(column string, op Operator, value any) (string, any)) Where {
-	return w.Map(func(expr Expression) Expression {
-
-		if expr == nil {
-			return nil
-		}
-
-		switch e := expr.(type) {
-		case Eq:
-			if e.Column, e.Value = mapper(e.Column, OpEQ, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Neq:
-			if e.Column, e.Value = mapper(e.Column, OpNEQ, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Gt:
-			if e.Column, e.Value = mapper(e.Column, OpGT, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Gte:
-			if e.Column, e.Value = mapper(e.Column, OpGTE, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Lt:
-			if e.Column, e.Value = mapper(e.Column, OpLT, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Lte:
-			if e.Column, e.Value = mapper(e.Column, OpLTE, e.Value); e.Column != "" {
-				return e
-			}
-			return nil
-		case Like:
-			if value, ok := e.Value.(string); ok {
-				prefix, suffix := "", ""
-				if strings.HasPrefix(value, "%") {
-					prefix = "%"
-					value = strings.TrimPrefix(value, "%")
-				}
-				if strings.HasSuffix(value, "%") {
-					suffix = "%"
-					value = strings.TrimSuffix(value, "%")
-				}
-				if col, val := mapper(e.Column, OpLIKE, value); col != "" {
-					e.Column = col
-					e.Value = prefix + val.(string) + suffix
-					return e
-				}
-				return nil
-			}
-			return e
-
-		case IN:
-			values := e.Values
-			column := e.Column
-			for i, v := range values {
-				column, values[i] = mapper(e.Column, OpIN, v)
-				if column == "" {
-					return nil
-				}
-			}
-			e.Column = column
-			e.Values = values
-			return e
-		}
-		return expr
-	})
-}
-
 // Condition 是表达式的规范化结构表示，便于统一遍历与改写。
 type Condition struct {
 	Column string
@@ -191,31 +58,39 @@ type Condition struct {
 	Values []any // 单值比较长度 1；IN 为多个；LIKE 为单个字符串
 }
 
-// toCondition 将 Expression 转换成 Condition。逻辑组合等不支持的类型 ok=false。
-func toCondition(expr Expression) (Condition, bool) {
+// AsCondition 将 Expression 转换成 Condition。逻辑组合等不支持的类型 ok=false。
+func AsCondition(expr Expression) (*Condition, bool) {
 	switch e := expr.(type) {
 	case Eq:
-		return Condition{e.Column, OpEQ, []any{e.Value}}, true
+		return &Condition{e.Column, OpEQ, []any{e.Value}}, true
 	case Neq:
-		return Condition{e.Column, OpNEQ, []any{e.Value}}, true
+		return &Condition{e.Column, OpNEQ, []any{e.Value}}, true
 	case Gt:
-		return Condition{e.Column, OpGT, []any{e.Value}}, true
+		return &Condition{e.Column, OpGT, []any{e.Value}}, true
 	case Gte:
-		return Condition{e.Column, OpGTE, []any{e.Value}}, true
+		return &Condition{e.Column, OpGTE, []any{e.Value}}, true
 	case Lt:
-		return Condition{e.Column, OpLT, []any{e.Value}}, true
+		return &Condition{e.Column, OpLT, []any{e.Value}}, true
 	case Lte:
-		return Condition{e.Column, OpLTE, []any{e.Value}}, true
+		return &Condition{e.Column, OpLTE, []any{e.Value}}, true
 	case Like:
-		return Condition{e.Column, OpLIKE, []any{e.Value}}, true
+		return &Condition{e.Column, OpLIKE, []any{e.Value}}, true
 	case IN:
-		return Condition{e.Column, OpIN, e.Values}, true
+		return &Condition{e.Column, OpIN, e.Values}, true
 	}
-	return Condition{}, false
+	return nil, false
 }
 
-// toExpression 由 Condition 重建 Expression。
-func toExpression(c Condition) Expression {
+func (c *Condition) ToExpr() Expression {
+
+	if c == nil {
+		return nil
+	}
+
+	if c.Column == "" {
+		return nil
+	}
+
 	switch c.Op {
 	case OpEQ:
 		return Eq{Column: c.Column, Value: c.Values[0]}
@@ -234,21 +109,57 @@ func toExpression(c Condition) Expression {
 	case OpIN:
 		return IN{Column: c.Column, Values: c.Values}
 	}
+
 	return nil
 }
 
-func (w Where) MapCondition(mapper func(Condition) Condition) Where {
-	return w.Map(func(expr Expression) Expression {
-		c, ok := toCondition(expr)
+// Map 遍历表达式列表，并生成新的表达式列表
+//
+// mapper 为表达式遍历函数，返回 nil 表示移除该表达式
+//   - e Expression 原表达式
+//   - c *Condition 解析出的 Condition 指针，当无法解析为 Condition 时，c 为 nil，如 And 等逻辑组合表达式
+//
+// 返回新的 Where 对象
+func (w Where) Map(mapper func(e Expression, c *Condition) Expression) Where {
+	exprs := mapExprs(w.Exprs, mapper)
+	return Where{Exprs: exprs}
+}
+
+func mapExprs(exprs []Expression, mapper func(e Expression, c *Condition) Expression) []Expression {
+	result := make([]Expression, 0, len(exprs))
+	for _, expr := range exprs {
+		c, ok := AsCondition(expr)
 		if !ok {
-			return expr // 逻辑组合等不支持的，原样保留
+
+			newExp := mapper(expr, nil)
+			if newExp == nil {
+				continue
+			}
+
+			switch e := newExp.(type) {
+			case AndExpr:
+				exprs := mapExprs(e.Exprs, mapper)
+				if expr := And(exprs...); expr != nil {
+					result = append(result, expr)
+				}
+			case OrExpr:
+				exprs := mapExprs(e.Exprs, mapper)
+				if expr := Or(exprs...); expr != nil {
+					result = append(result, expr)
+				}
+			case NotExpr:
+				exprs := mapExprs(e.Exprs, mapper)
+				if expr := Not(exprs...); expr != nil {
+					result = append(result, expr)
+				}
+			}
+			continue
 		}
-		c = mapper(c)
-		if c.Column == "" {
-			return nil // 移除
+		if e := mapper(expr, c); e != nil {
+			result = append(result, e)
 		}
-		return toExpression(c)
-	})
+	}
+	return result
 }
 
 // And 将多个表达式用 AND 逻辑组合。
