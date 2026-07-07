@@ -41,18 +41,18 @@ type WhereConverter func(e clause.Expression, c *clause.Condition) (gormExpr gor
 // OrderByConverter 将 OrderBy 转换为 GORM 的 OrderByColumn；若转换成功 converted 为 true，否则由默认逻辑处理。
 type OrderByConverter func(o clause.OrderBy) (gormOrder gormClause.OrderByColumn, converted bool)
 
-func WhereExpr(where clause.Where, convs ...WhereConverter) gormClause.Expression {
+func WhereExpr(where clause.Where, convs ...WhereConverter) gormClause.Where {
+
+	gormWhere := gormClause.Where{}
+
 	if len(where.Exprs) == 0 {
-		return nil
+		return gormWhere
 	}
 
 	// 将 query/clause.Where 转换为 gorm/clause.Where
-	gormExprs := convertWhere(where.Exprs, convs...)
-	if len(gormExprs) == 0 {
-		return nil
-	}
+	gormWhere.Exprs = convertWhere(where.Exprs, convs...)
 
-	return gormClause.Where{Exprs: gormExprs}
+	return gormWhere
 }
 
 // WhereScope 将 clause.Where 转换为 GORM Scope 函数。
@@ -64,7 +64,7 @@ func WhereScope(where clause.Where, convs ...WhereConverter) func(db *gorm.DB) *
 
 		gormWhere := WhereExpr(where, convs...)
 
-		if gormWhere == nil {
+		if len(gormWhere.Exprs) == 0 {
 			return db
 		}
 
