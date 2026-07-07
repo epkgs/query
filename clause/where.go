@@ -148,22 +148,25 @@ func (w Where) MapColumn(mapper func(column string, op Operator, value any) (str
 			}
 			return nil
 		case Like:
-			prefix, suffix := "", ""
-			value := e.Value.(string)
-			if strings.HasPrefix(value, "%") {
-				prefix = "%"
-				value = strings.TrimPrefix(value, "%")
+			if value, ok := e.Value.(string); ok {
+				prefix, suffix := "", ""
+				if strings.HasPrefix(value, "%") {
+					prefix = "%"
+					value = strings.TrimPrefix(value, "%")
+				}
+				if strings.HasSuffix(value, "%") {
+					suffix = "%"
+					value = strings.TrimSuffix(value, "%")
+				}
+				if col, val := mapper(e.Column, OpLIKE, value); col != "" {
+					e.Column = col
+					e.Value = prefix + val.(string) + suffix
+					return e
+				}
+				return nil
 			}
-			if strings.HasSuffix(value, "%") {
-				suffix = "%"
-				value = strings.TrimSuffix(value, "%")
-			}
-			if col, val := mapper(e.Column, OpLIKE, value); col != "" {
-				e.Column = col
-				e.Value = prefix + val.(string) + suffix
-				return e
-			}
-			return nil
+			return e
+
 		case IN:
 			values := e.Values
 			column := e.Column
@@ -178,6 +181,73 @@ func (w Where) MapColumn(mapper func(column string, op Operator, value any) (str
 			return e
 		}
 		return expr
+	})
+}
+
+// Condition 是表达式的规范化结构表示，便于统一遍历与改写。
+type Condition struct {
+	Column string
+	Op     Operator
+	Values []any // 单值比较长度 1；IN 为多个；LIKE 为单个字符串
+}
+
+// toCondition 将 Expression 转换成 Condition。逻辑组合等不支持的类型 ok=false。
+func toCondition(expr Expression) (Condition, bool) {
+	switch e := expr.(type) {
+	case Eq:
+		return Condition{e.Column, OpEQ, []any{e.Value}}, true
+	case Neq:
+		return Condition{e.Column, OpNEQ, []any{e.Value}}, true
+	case Gt:
+		return Condition{e.Column, OpGT, []any{e.Value}}, true
+	case Gte:
+		return Condition{e.Column, OpGTE, []any{e.Value}}, true
+	case Lt:
+		return Condition{e.Column, OpLT, []any{e.Value}}, true
+	case Lte:
+		return Condition{e.Column, OpLTE, []any{e.Value}}, true
+	case Like:
+		return Condition{e.Column, OpLIKE, []any{e.Value}}, true
+	case IN:
+		return Condition{e.Column, OpIN, e.Values}, true
+	}
+	return Condition{}, false
+}
+
+// toExpression 由 Condition 重建 Expression。
+func toExpression(c Condition) Expression {
+	switch c.Op {
+	case OpEQ:
+		return Eq{Column: c.Column, Value: c.Values[0]}
+	case OpNEQ:
+		return Neq{Column: c.Column, Value: c.Values[0]}
+	case OpGT:
+		return Gt{Column: c.Column, Value: c.Values[0]}
+	case OpGTE:
+		return Gte{Column: c.Column, Value: c.Values[0]}
+	case OpLT:
+		return Lt{Column: c.Column, Value: c.Values[0]}
+	case OpLTE:
+		return Lte{Column: c.Column, Value: c.Values[0]}
+	case OpLIKE:
+		return Like{Column: c.Column, Value: c.Values[0]}
+	case OpIN:
+		return IN{Column: c.Column, Values: c.Values}
+	}
+	return nil
+}
+
+func (w Where) MapCondition(mapper func(Condition) Condition) Where {
+	return w.Map(func(expr Expression) Expression {
+		c, ok := toCondition(expr)
+		if !ok {
+			return expr // 逻辑组合等不支持的，原样保留
+		}
+		c = mapper(c)
+		if c.Column == "" {
+			return nil // 移除
+		}
+		return toExpression(c)
 	})
 }
 
