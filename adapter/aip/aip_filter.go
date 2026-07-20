@@ -123,7 +123,7 @@ func parseCallExpr(call *exprpb.Expr_Call) ([]clause.Expression, error) {
 		return parseLessEqualsExpr(call.Args)
 	case "NOT":
 		return parseNotExpr(call.Args)
-	case "HAS", "IN":
+	case "HAS", "IN", ":":
 		return parseHasExpr(call.Args)
 	default:
 		return nil, fmt.Errorf("unsupported function: %s", funcName)
