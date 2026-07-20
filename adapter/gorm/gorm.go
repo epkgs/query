@@ -144,7 +144,7 @@ func convertExpr(expr clause.Expression, convs ...WhereConverter) gormClause.Exp
 	if e, ok := expr.(clause.LogicalExpression); ok {
 		var gormExprs []gormClause.Expression
 		for _, subExpr := range e.SubExprs() {
-			gormExpr := convertExpr(subExpr)
+			gormExpr := convertExpr(subExpr, convs...)
 			if gormExpr != nil {
 				gormExprs = append(gormExprs, gormExpr)
 			}
