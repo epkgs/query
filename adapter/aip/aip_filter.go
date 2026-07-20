@@ -22,6 +22,7 @@ package aip
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/epkgs/query"
 	"github.com/epkgs/query/clause"
@@ -31,7 +32,7 @@ import (
 )
 
 // FromFilter 将 AIP 标准的 filtering.Filter 转换为 clause.Where。
-// 支持 AIP 过滤语法中的所有常见运算符：=, !=, >, >=, <, <=, IN, NOT, AND, OR。
+// 支持 AIP 过滤语法中的所有常见运算符：=, !=, >, >=, <, <=, HAS(:), IN, NOT, AND, OR。
 // 当 Filter.CheckedExpr 为空时（即未传递过滤参数），返回空的 clause.Where。
 func FromFilter(filter filtering.Filter) (clause.Where, error) {
 	// 创建 Query 对象
@@ -124,8 +125,10 @@ func parseCallExpr(call *exprpb.Expr_Call) ([]clause.Expression, error) {
 		return parseLessEqualsExpr(call.Args)
 	case "NOT":
 		return parseNotExpr(call.Args)
-	case "HAS", "IN", ":":
+	case "HAS", ":":
 		return parseHasExpr(call.Args)
+	case "IN", "_in_":
+		return parseInExpr(call.Args)
 	default:
 		return nil, fmt.Errorf("unsupported function: %s", funcName)
 	}
@@ -368,23 +371,97 @@ func parseNotExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 	return []clause.Expression{clause.Not(parsed...)}, nil
 }
 
-// parseHasExpr 解析 HAS 函数
+// parseHasExpr 解析 HAS（含冒号运算符 `:`）函数。
+//
+// HAS 用于字符串字段时支持以下通配符模式（`*` 会被转换为 SQL LIKE 的 `%`）：
+//   - `field:value`        -> `field LIKE '%value%'`（无通配符时按子串匹配）
+//   - `field:value*`       -> `field LIKE 'value%'`  （右侧通配符，匹配以 value 开头）
+//   - `field:*value`       -> `field LIKE '%value'`  （左侧通配符，匹配以 value 结尾）
+//   - `field:*`            -> `field IS NOT NULL`    （仅通配符表示存在性检查）
+//
+// 对于非字符串值（如 repeated 字段的元素匹配），仍按 IN 单值语义处理。
 func parseHasExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("HAS expects exactly 2 arguments, got %d", len(args))
 	}
 
-	// 解析字段名
 	field, err := parseField(args[0])
 	if err != nil {
 		return nil, err
 	}
 
-	// 解析值
 	value, err := parseValue(args[1])
 	if err != nil {
 		return nil, err
 	}
 
+	// 字符串值使用 LIKE 通配符语义；其它值退化为集合成员判断（IN 单值）。
+	if s, ok := value.(string); ok {
+		return []clause.Expression{hasLikeExpr(field, s)}, nil
+	}
+
 	return []clause.Expression{clause.IN{Col: field, Vals: []interface{}{value}}}, nil
+}
+
+// hasLikeExpr 根据 HAS 的通配符模式生成对应的 LIKE 表达式。
+func hasLikeExpr(field, pattern string) clause.Expression {
+	// `field:*` 表示存在性检查
+	if pattern == "*" {
+		return clause.Neq{Col: field, Val: nil}
+	}
+
+	// 没有显式通配符时按子串匹配处理
+	if !strings.Contains(pattern, "*") {
+		return clause.Like{Col: field, Val: "%" + pattern + "%"}
+	}
+
+	// 将 `*` 替换为 SQL LIKE 的 `%`
+	likeVal := strings.ReplaceAll(pattern, "*", "%")
+	return clause.Like{Col: field, Val: likeVal}
+}
+
+// parseInExpr 解析 IN 函数。
+//
+// 右侧参数可以是列表表达式（如 `[1, 2, 3]`）或单个值，统一生成 clause.IN。
+func parseInExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("IN expects exactly 2 arguments, got %d", len(args))
+	}
+
+	field, err := parseField(args[0])
+	if err != nil {
+		return nil, err
+	}
+
+	vals, err := parseValues(args[1])
+	if err != nil {
+		return nil, err
+	}
+
+	return []clause.Expression{clause.IN{Col: field, Vals: vals}}, nil
+}
+
+// parseValues 解析值表达式，支持列表和单个常量。
+func parseValues(exp *exprpb.Expr) ([]interface{}, error) {
+	if exp == nil {
+		return nil, fmt.Errorf("nil value expression")
+	}
+
+	if list := exp.GetListExpr(); list != nil {
+		vals := make([]interface{}, 0, len(list.Elements))
+		for _, e := range list.Elements {
+			v, err := parseValue(e)
+			if err != nil {
+				return nil, err
+			}
+			vals = append(vals, v)
+		}
+		return vals, nil
+	}
+
+	v, err := parseValue(exp)
+	if err != nil {
+		return nil, err
+	}
+	return []interface{}{v}, nil
 }

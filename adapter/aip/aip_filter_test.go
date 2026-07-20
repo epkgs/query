@@ -7,6 +7,7 @@ import (
 
 	"github.com/epkgs/query/clause"
 	filtering "go.einride.tech/aip/filtering"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // mockFilterRequest 是一个用于测试的 Request 实现
@@ -215,4 +216,57 @@ func TestFromFilter_ComplexNestedCondition(t *testing.T) {
 		"(`name` = $1 AND (`age` > $2 OR `age` < $3)) OR (`name` = $4 AND `age` < $5)",
 		5,
 	)
+}
+
+// TestFromFilter_HasSubstring 测试 HAS 无通配符时按子串匹配
+func TestFromFilter_HasSubstring(t *testing.T) {
+	testFilterConversion(t, "name:John", "`name` LIKE $1", 1)
+}
+
+// TestFromFilter_HasPrefix 测试 HAS 右侧通配符（value*）
+func TestFromFilter_HasPrefix(t *testing.T) {
+	testFilterConversion(t, "name:John*", "`name` LIKE $1", 1)
+}
+
+// TestFromFilter_HasSuffix 测试 HAS 左侧通配符（*value）
+func TestFromFilter_HasSuffix(t *testing.T) {
+	testFilterConversion(t, "name:*John", "`name` LIKE $1", 1)
+}
+
+// TestFromFilter_HasExistence 测试 HAS 仅通配符（*）表示存在性检查
+func TestFromFilter_HasExistence(t *testing.T) {
+	testFilterConversion(t, "name:*", "`name` IS NOT NULL", 0)
+}
+
+// TestParseInExpr 测试 IN 表达式解析
+func TestParseInExpr(t *testing.T) {
+	exprs, err := parseInExpr([]*exprpb.Expr{
+		{ExprKind: &exprpb.Expr_IdentExpr{IdentExpr: &exprpb.Expr_Ident{Name: "name"}}},
+		{
+			ExprKind: &exprpb.Expr_ListExpr{
+				ListExpr: &exprpb.Expr_CreateList{
+					Elements: []*exprpb.Expr{
+						{ExprKind: &exprpb.Expr_ConstExpr{ConstExpr: &exprpb.Constant{ConstantKind: &exprpb.Constant_StringValue{StringValue: "John"}}}},
+						{ExprKind: &exprpb.Expr_ConstExpr{ConstExpr: &exprpb.Constant{ConstantKind: &exprpb.Constant_StringValue{StringValue: "Jane"}}}},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("parseInExpr failed: %v", err)
+	}
+	if len(exprs) != 1 {
+		t.Fatalf("expected 1 expression, got %d", len(exprs))
+	}
+	in, ok := exprs[0].(clause.IN)
+	if !ok {
+		t.Fatalf("expected clause.IN, got %T", exprs[0])
+	}
+	if in.Col != "name" {
+		t.Errorf("expected column name, got %s", in.Col)
+	}
+	if len(in.Vals) != 2 {
+		t.Errorf("expected 2 values, got %d", len(in.Vals))
+	}
 }
