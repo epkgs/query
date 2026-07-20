@@ -50,11 +50,12 @@ func FromFilter(filter filtering.Filter) (clause.Where, error) {
 
 			isOr := false
 			if len(exprs) == 1 {
-				if andExpr, ok := exprs[0].(clause.AndExpr); ok {
-					exprs = andExpr.Exprs
-				} else if orExpr, ok := exprs[0].(clause.OrExpr); ok {
-					exprs = orExpr.Exprs
-					isOr = true
+				if logical, ok := exprs[0].(clause.LogicalExpression); ok {
+					switch logical.Operator() {
+					case clause.LogicAnd, clause.LogicOr:
+						exprs = logical.SubExprs()
+						isOr = logical.Operator() == clause.LogicOr
+					}
 				}
 			}
 
@@ -86,7 +87,7 @@ func parseExpr(exp *exprpb.Expr) ([]clause.Expression, error) {
 	case *exprpb.Expr_IdentExpr:
 		// 处理标识符表达式（字段名）
 		fieldName := kind.IdentExpr.Name
-		return []clause.Expression{clause.Eq{Column: fieldName, Value: true}}, nil
+		return []clause.Expression{clause.Eq{Col: fieldName, Val: true}}, nil
 	default:
 		// TODO: 支持更多类型
 		return nil, fmt.Errorf("unsupported expression type: %T", kind)
@@ -241,7 +242,7 @@ func parseEqualsExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Eq{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Eq{Col: field, Val: value}}, nil
 }
 
 // parseNotEqualsExpr 解析 NOT_EQUALS 函数
@@ -262,7 +263,7 @@ func parseNotEqualsExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Neq{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Neq{Col: field, Val: value}}, nil
 }
 
 // parseGreaterThanExpr 解析 GREATER_THAN 函数
@@ -283,7 +284,7 @@ func parseGreaterThanExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Gt{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Gt{Col: field, Val: value}}, nil
 }
 
 // parseGreaterEqualsExpr 解析 GREATER_EQUALS 函数
@@ -304,7 +305,7 @@ func parseGreaterEqualsExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Gte{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Gte{Col: field, Val: value}}, nil
 }
 
 // parseLessThanExpr 解析 LESS_THAN 函数
@@ -325,7 +326,7 @@ func parseLessThanExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Lt{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Lt{Col: field, Val: value}}, nil
 }
 
 // parseLessEqualsExpr 解析 LESS_EQUALS 函数
@@ -346,7 +347,7 @@ func parseLessEqualsExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.Lte{Column: field, Value: value}}, nil
+	return []clause.Expression{clause.Lte{Col: field, Val: value}}, nil
 }
 
 // parseNotExpr 解析 NOT 函数
@@ -385,5 +386,5 @@ func parseHasExpr(args []*exprpb.Expr) ([]clause.Expression, error) {
 		return nil, err
 	}
 
-	return []clause.Expression{clause.IN{Column: field, Values: []interface{}{value}}}, nil
+	return []clause.Expression{clause.IN{Col: field, Vals: []interface{}{value}}}, nil
 }

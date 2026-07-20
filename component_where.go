@@ -60,7 +60,7 @@ func (w *where[Q]) WhereExpr() clause.Where {
 // 示例:
 //   - q.Where("name", "John")
 //   - q.Where("age", ">", 18)
-//   - q.Where(clause.Eq{Column: "name", Value: "John"})
+//   - q.Where(clause.Eq{Col: "name", Val: "John"})
 //   - q.Where(func(w Wherer) Wherer {  w.Where("name", "John"); return w.Parent })
 func (w *where[Q]) Where(field any, args ...any) Q {
 	expressions, err := buildCondition(field, args...)
@@ -86,7 +86,7 @@ func (w *where[Q]) Where(field any, args ...any) Q {
 // 示例:
 //   - q.OrWhere("name", "John")
 //   - q.OrWhere("age", ">", 18)
-//   - q.OrWhere(clause.Eq{Column: "name", Value: "John"})
+//   - q.OrWhere(clause.Eq{Col: "name", Val: "John"})
 //   - q.OrWhere(func(w Wherer) Wherer {  w.Where("name", "John"); return w.Parent })
 func (w *where[Q]) OrWhere(field any, args ...any) Q {
 	expressions, err := buildCondition(field, args...)
@@ -114,7 +114,7 @@ func (w *where[Q]) OrWhere(field any, args ...any) Q {
 // 示例:
 //   - q.Not("name", "John")
 //   - q.Not("age", ">", 18)
-//   - q.Not(clause.Eq{Column: "name", Value: "John"})
+//   - q.Not(clause.Eq{Col: "name", Val: "John"})
 //   - q.Not(func(w Wherer) Wherer {  w.Where("name", "John"); return w.Parent })
 func (w *where[Q]) NotWhere(field any, args ...any) Q {
 	expressions, err := buildCondition(field, args...)
@@ -161,11 +161,8 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 		return []clause.Expression{clause.And(exprs...)}, nil
 	case clause.Where:
 		return c.Exprs, nil
-	case clause.AndExpr:
-		// 如果是AndExpr类型，将其作为单个表达式返回
-		return []clause.Expression{c}, nil
-	case clause.OrExpr:
-		// 如果是OrExpr类型，将其作为单个表达式返回
+	case clause.LogicalExpression:
+		// 如果是逻辑组合表达式，将其作为单个表达式返回
 		return []clause.Expression{c}, nil
 	case []clause.Expression:
 		// 如果是Expression数组，直接返回
@@ -177,16 +174,16 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 		// 如果是字符串字段名，根据参数数量构建不同条件
 		if len(args) == 0 {
 			// 只有一个参数，构建 column = value 条件（column为空）
-			return []clause.Expression{clause.Eq{Column: "", Value: c}}, nil
+			return []clause.Expression{clause.Eq{Col: "", Val: c}}, nil
 		}
 		if len(args) == 1 {
 			// 两个参数，判断第二个参数是否为数组
 			if arr, ok := args[0].([]interface{}); ok {
 				// 如果是数组，构建IN条件
-				return []clause.Expression{clause.IN{Column: c, Values: arr}}, nil
+				return []clause.Expression{clause.IN{Col: c, Vals: arr}}, nil
 			} else {
 				// 如果不是数组，构建=条件
-				return []clause.Expression{clause.Eq{Column: c, Value: args[0]}}, nil
+				return []clause.Expression{clause.Eq{Col: c, Val: args[0]}}, nil
 			}
 		}
 
@@ -200,21 +197,21 @@ func buildCondition(column any, args ...any) ([]clause.Expression, error) {
 		// 根据操作符构建不同的比较条件
 		switch op {
 		case "=":
-			return []clause.Expression{clause.Eq{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Eq{Col: c, Val: args[1]}}, nil
 		case "!=":
-			return []clause.Expression{clause.Neq{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Neq{Col: c, Val: args[1]}}, nil
 		case ">":
-			return []clause.Expression{clause.Gt{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Gt{Col: c, Val: args[1]}}, nil
 		case ">=":
-			return []clause.Expression{clause.Gte{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Gte{Col: c, Val: args[1]}}, nil
 		case "<":
-			return []clause.Expression{clause.Lt{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Lt{Col: c, Val: args[1]}}, nil
 		case "<=":
-			return []clause.Expression{clause.Lte{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Lte{Col: c, Val: args[1]}}, nil
 		case "LIKE", "like":
-			return []clause.Expression{clause.Like{Column: c, Value: args[1]}}, nil
+			return []clause.Expression{clause.Like{Col: c, Val: args[1]}}, nil
 		case "IN", "in":
-			return []clause.Expression{clause.IN{Column: c, Values: toAnySlice(args[1])}}, nil
+			return []clause.Expression{clause.IN{Col: c, Vals: toAnySlice(args[1])}}, nil
 		default:
 			// 不支持的操作符
 			return nil, ErrInvalidOperator
@@ -363,43 +360,43 @@ func (w *where[Q]) Not(q Wherer) Q {
 
 // Eq 添加等于条件
 func (w *where[Q]) Eq(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Eq{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Eq{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Neq 添加不等于条件
 func (w *where[Q]) Neq(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Neq{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Neq{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Gt 添加大于条件
 func (w *where[Q]) Gt(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Gt{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Gt{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Gte 添加大于等于条件
 func (w *where[Q]) Gte(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Gte{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Gte{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Lt 添加小于条件
 func (w *where[Q]) Lt(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Lt{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Lt{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Lte 添加小于等于条件
 func (w *where[Q]) Lte(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Lte{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Lte{Col: column, Val: value}}})
 	return w.Parent
 }
 
 // Like 添加 LIKE 条件
 func (w *where[Q]) Like(column string, value any) Q {
-	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Like{Column: column, Value: value}}})
+	w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.Like{Col: column, Val: value}}})
 	return w.Parent
 }
 
@@ -411,9 +408,9 @@ func (w *where[Q]) Like(column string, value any) Q {
 //   - In("id", []int{1, 2, 3})
 func (w *where[Q]) In(column string, values ...any) Q {
 	if len(values) == 1 {
-		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: toAnySlice(values[0])}}})
+		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Col: column, Vals: toAnySlice(values[0])}}})
 	} else if len(values) > 1 {
-		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: values}}})
+		w.Value.Merge(clause.Where{Exprs: []clause.Expression{clause.IN{Col: column, Vals: values}}})
 	}
 	return w.Parent
 }

@@ -19,7 +19,7 @@
 //	// 2. 使用 ExprHandler 映射字段名
 //	handler := func(expr clause.Expression) clause.Expression {
 //	    if eq, ok := expr.(clause.Eq); ok {
-//	        eq.Column = fieldMappings[eq.Column]
+//	        eq.Col = fieldMappings[eq.Col]
 //	    }
 //	    return expr
 //	}
@@ -54,10 +54,10 @@ type Option func(*options)
 //	handler := func(expr clause.Expression) clause.Expression {
 //	    switch e := expr.(type) {
 //	    case clause.Eq:
-//	        e.Column = fieldMappings[e.Column]
+//	        e.Col = fieldMappings[e.Col]
 //	        return e
 //	    case clause.Like:
-//	        e.Column = fieldMappings[e.Column]
+//	        e.Col = fieldMappings[e.Col]
 //	        return e
 //	    }
 //	    return expr
@@ -161,78 +161,52 @@ func convertToEntPredicate(pre *sql.Predicate, expr clause.Expression, opt *opti
 
 	switch e := expr.(type) {
 	case clause.Eq:
-		return sqlAnd(pre, sql.EQ(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.EQ(e.Col, e.Val)), nil
 	case clause.Neq:
-		return sqlAnd(pre, sql.NEQ(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.NEQ(e.Col, e.Val)), nil
 	case clause.Gt:
-		return sqlAnd(pre, sql.GT(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.GT(e.Col, e.Val)), nil
 	case clause.Gte:
-		return sqlAnd(pre, sql.GTE(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.GTE(e.Col, e.Val)), nil
 	case clause.Lt:
-		return sqlAnd(pre, sql.LT(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.LT(e.Col, e.Val)), nil
 	case clause.Lte:
-		return sqlAnd(pre, sql.LTE(e.Column, e.Value)), nil
+		return sqlAnd(pre, sql.LTE(e.Col, e.Val)), nil
 	case clause.Like:
 		// 将 interface{} 转换为 string
-		if likeValue, ok := e.Value.(string); ok {
-			return sqlAnd(pre, sql.Like(e.Column, likeValue)), nil
+		if likeValue, ok := e.Val.(string); ok {
+			return sqlAnd(pre, sql.Like(e.Col, likeValue)), nil
 		}
 		return nil, errors.New("like value must be string")
 	case clause.IN:
-		return sqlAnd(pre, sql.In(e.Column, e.Values...)), nil
-	case clause.AndExpr:
-		// 对于 AND 表达式，递归处理所有子表达式
-		if len(e.Exprs) == 0 {
+		return sqlAnd(pre, sql.In(e.Col, e.Vals...)), nil
+	case clause.LogicalExpression:
+		subExprs := e.SubExprs()
+		if len(subExprs) == 0 {
 			return pre, nil
 		}
-		// 初始化 AND 条件
+
 		var subPred *sql.Predicate
 		var err error
-		for _, subExpr := range e.Exprs {
+		for _, subExpr := range subExprs {
 			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		if pre != nil {
-			return sql.And(pre, subPred), nil
-		}
-		return subPred, nil
-	case clause.OrExpr:
-		// 对于 OR 表达式，递归处理所有子表达式
-		if len(e.Exprs) == 0 {
-			return nil, nil
-		}
-		// 初始化 OR 条件
-		var subPred *sql.Predicate
-		var err error
-		for _, subExpr := range e.Exprs {
-			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
-			if err != nil {
-				return nil, err
+		switch e.Operator() {
+		case clause.LogicAnd:
+			if pre != nil {
+				return sql.And(pre, subPred), nil
 			}
+			return subPred, nil
+		case clause.LogicOr:
+			return sqlOr(pre, subPred), nil
+		case clause.LogicNot:
+			return sqlAnd(pre, sql.Not(subPred)), nil
 		}
-
-		return sqlOr(pre, subPred), nil
-
-	case clause.NotExpr:
-		// 对于 NOT 表达式，递归处理所有子表达式
-		if len(e.Exprs) == 0 {
-			return nil, nil
-		}
-
-		// 初始化 NOT 条件
-		var subPred *sql.Predicate
-		var err error
-		for _, subExpr := range e.Exprs {
-			subPred, err = convertToEntPredicate(subPred, subExpr, opt)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return sqlAnd(pre, sql.Not(subPred)), nil
+		return pre, nil
 	default:
 		return nil, nil
 	}

@@ -21,9 +21,9 @@
 // 自定义转换：
 //
 //	// 自定义 WhereConverter，将 JSON 字段转换为 GORM 的 JSON 查询表达式
-//	jsonConv := func(e clause.Expression, c *clause.Condition) (gormExpr gormClause.Expression, converted bool) {
-//	    if c != nil && c.Column == "tags" {
-//	        return gormClause.Expr{SQL: "JSON_CONTAINS(tags, ?)", Vars: []interface{}{c.Values[0]}}, true
+//	jsonConv := func(e clause.Expression) (gormExpr gormClause.Expression, converted bool) {
+//	    if c, ok := e.(clause.ComparisonExpression); ok && c.Column() == "tags" {
+//	        return gormClause.Expr{SQL: "JSON_CONTAINS(tags, ?)", Vars: []any{c.Value()}}, true
 //	    }
 //	    return nil, false
 //	}
@@ -48,7 +48,7 @@ import (
 )
 
 // WhereConverter 将 Expression 转换为 GORM 的 Expression；若转换成功 converted 为 true，否则由默认逻辑处理。
-type WhereConverter func(e clause.Expression, c *clause.Condition) (gormExpr gormClause.Expression, converted bool)
+type WhereConverter func(e clause.Expression) (gormExpr gormClause.Expression, converted bool)
 
 // OrderByConverter 将 OrderBy 转换为 GORM 的 OrderByColumn；若转换成功 converted 为 true，否则由默认逻辑处理。
 type OrderByConverter func(o clause.OrderBy) (gormOrder gormClause.OrderByColumn, converted bool)
@@ -60,22 +60,7 @@ type OrderByConverter func(o clause.OrderBy) (gormOrder gormClause.OrderByColumn
 // 转换器按顺序执行，第一个返回 converted=true 的转换器结果即为最终结果，
 // 若所有转换器均未转换，则使用默认逻辑处理。
 func WhereExpr(expr clause.Expression, convs ...WhereConverter) gormClause.Expression {
-
-	if expr == nil {
-		return nil
-	}
-
-	if len(convs) > 0 {
-		c, _ := clause.AsCondition(expr)
-		for _, conv := range convs {
-			gormExpr, converted := conv(expr, c)
-			if converted {
-				return gormExpr
-			}
-		}
-	}
-
-	return convertExpr(expr)
+	return convertExpr(expr, convs...)
 }
 
 // WhereExprs 批量将 clause.Expression 列表转换为 GORM 的 Expression 列表。
@@ -86,13 +71,14 @@ func WhereExprs(exprs []clause.Expression, convs ...WhereConverter) []gormClause
 	gormExprs := make([]gormClause.Expression, 0, len(exprs))
 
 	for _, expr := range exprs {
-		if expr == nil {
+
+		e := convertExpr(expr, convs...)
+
+		if e == nil {
 			continue
 		}
-		e := WhereExpr(expr, convs...)
-		if e != nil {
-			gormExprs = append(gormExprs, e)
-		}
+
+		gormExprs = append(gormExprs, e)
 	}
 	return gormExprs
 }
@@ -116,68 +102,68 @@ func WhereScope(where clause.Where, convs ...WhereConverter) func(db *gorm.DB) *
 }
 
 // convertExpr 将 query/clause.Expression 转换为 gorm/clause.Expression
-func convertExpr(expr clause.Expression) gormClause.Expression {
+func convertExpr(expr clause.Expression, convs ...WhereConverter) gormClause.Expression {
 
 	if expr == nil {
 		return nil
 	}
 
-	switch e := expr.(type) {
-	case clause.Eq:
-		return gormClause.Eq{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Neq:
-		return gormClause.Neq{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Gt:
-		return gormClause.Gt{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Gte:
-		return gormClause.Gte{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Lt:
-		return gormClause.Lt{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Lte:
-		return gormClause.Lte{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.Like:
-		return gormClause.Like{Column: gormClause.Column{Name: e.Column}, Value: e.Value}
-	case clause.IN:
-		return gormClause.IN{Column: gormClause.Column{Name: e.Column}, Values: e.Values}
-	case clause.AndExpr:
-		var gormExprs []gormClause.Expression
-		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr)
-			if gormExpr != nil {
-				gormExprs = append(gormExprs, gormExpr)
+	if e, ok := expr.(clause.ComparisonExpression); ok {
+
+		if len(convs) > 0 {
+			for _, conv := range convs {
+				gormExpr, converted := conv(e)
+				if converted {
+					return gormExpr
+				}
 			}
 		}
-		if len(gormExprs) == 0 {
-			return nil
+
+		switch e.Operator() {
+		case clause.OpEQ:
+			return gormClause.Eq{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpNEQ:
+			return gormClause.Neq{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpGT:
+			return gormClause.Gt{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpGTE:
+			return gormClause.Gte{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpLT:
+			return gormClause.Lt{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpLTE:
+			return gormClause.Lte{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpLIKE:
+			return gormClause.Like{Column: gormClause.Column{Name: e.Column()}, Value: e.Value()}
+		case clause.OpIN:
+			return gormClause.IN{Column: gormClause.Column{Name: e.Column()}, Values: e.Value().([]any)}
 		}
-		return gormClause.And(gormExprs...)
-	case clause.OrExpr:
-		var gormExprs []gormClause.Expression
-		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr)
-			if gormExpr != nil {
-				gormExprs = append(gormExprs, gormExpr)
-			}
-		}
-		if len(gormExprs) == 0 {
-			return nil
-		}
-		return gormClause.Or(gormExprs...)
-	case clause.NotExpr:
-		var gormExprs []gormClause.Expression
-		for _, subExpr := range e.Exprs {
-			gormExpr := convertExpr(subExpr)
-			if gormExpr != nil {
-				gormExprs = append(gormExprs, gormExpr)
-			}
-		}
-		if len(gormExprs) == 0 {
-			return nil
-		}
-		return gormClause.Not(gormExprs...)
-	default:
+
 		return nil
 	}
+
+	if e, ok := expr.(clause.LogicalExpression); ok {
+		var gormExprs []gormClause.Expression
+		for _, subExpr := range e.SubExprs() {
+			gormExpr := convertExpr(subExpr)
+			if gormExpr != nil {
+				gormExprs = append(gormExprs, gormExpr)
+			}
+		}
+		if len(gormExprs) == 0 {
+			return nil
+		}
+		switch e.Operator() {
+		case clause.LogicAnd:
+			return gormClause.And(gormExprs...)
+		case clause.LogicOr:
+			return gormClause.Or(gormExprs...)
+		case clause.LogicNot:
+			return gormClause.Not(gormExprs...)
+		}
+		return nil
+	}
+
+	return nil
 }
 
 // OrderByExpr 将单个 clause.OrderBy 转换为 GORM 的 OrderByColumn。

@@ -523,7 +523,7 @@ func TestWithExprHandler(t *testing.T) {
 	handler := func(expr clause.Expression) clause.Expression {
 		switch e := expr.(type) {
 		case clause.Gt:
-			if e.Column == "age" {
+			if e.Col == "age" {
 				return nil // 过滤掉 age 条件
 			}
 		}
@@ -687,7 +687,7 @@ func TestLikeWhereFunc_InvalidValue(t *testing.T) {
 	// 创建一个错误的 LIKE 条件（值不是字符串）
 	where := clause.Where{
 		Exprs: []clause.Expression{
-			clause.Like{Column: "name", Value: 123}, // 错误：值不是字符串
+			clause.Like{Col: "name", Val: 123}, // 错误：值不是字符串
 		},
 	}
 

@@ -490,11 +490,9 @@ func TestComparisonOperators(t *testing.T) {
 func TestWithExprHandler(t *testing.T) {
 	// 创建查询条件
 	q := query.Eq("name", "John").Gt("age", 18)
-	where := q.WhereExpr().Map(func(e clause.Expression, c *clause.Condition) clause.Expression {
-		if c != nil {
-			if c.Column == "age" {
-				return nil // 过滤掉 age 条件
-			}
+	where := q.WhereExpr().Map(func(e clause.Expression) clause.Expression {
+		if cmp, ok := e.(clause.ComparisonExpression); ok && cmp.Column() == "age" {
+			return nil // 过滤掉 age 条件
 		}
 		return e
 	})

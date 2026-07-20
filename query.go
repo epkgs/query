@@ -120,7 +120,7 @@ func Table(tableName string) *Query {
 // 示例:
 //   - q.Where("name", "John")
 //   - q.Where("age", ">", 18)
-//   - q.Where(clause.Eq{Column: "name", Value: "John"})
+//   - q.Where(clause.Eq{Col: "name", Val: "John"})
 //   - q.Where(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
 func Where(field any, args ...any) *Query {
 	return newQuery("").Where(field, args...)
@@ -140,7 +140,7 @@ func Where(field any, args ...any) *Query {
 // 示例:
 //   - q.OrWhere("name", "John")
 //   - q.OrWhere("age", ">", 18)
-//   - q.OrWhere(clause.Eq{Column: "name", Value: "John"})
+//   - q.OrWhere(clause.Eq{Col: "name", Val: "John"})
 //   - q.OrWhere(func(w Wherer) Wherer {  w.Where("name", "John"); return w })
 func OrWhere(field any, args ...any) *Query {
 	return newQuery("").OrWhere(field, args...)

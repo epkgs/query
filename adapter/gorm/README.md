@@ -163,16 +163,17 @@ db.Model(&User{}).
 在转换为 GORM 表达式时，可通过 `WhereConverter` 自定义转换逻辑。若转换成功（`converted` 为 `true`），使用自定义结果；否则由默认逻辑处理。可用于自定义字段映射、条件过滤等。
 
 ```go
-type WhereConverter func(e clause.Expression, c *clause.Condition) (gormExpr gormClause.Expression, converted bool)
+type WhereConverter func(e clause.Expression) (gormExpr gormClause.Expression, converted bool)
 ```
 
 **示例：字段名映射**
 
 ```go
-columnMapper := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
-    if c != nil && c.Column == "user_name" {
+columnMapper := func(e clause.Expression) (gormClause.Expression, bool) {
+    cmp, ok := e.(clause.ComparisonExpression)
+    if ok && cmp.Column() == "user_name" {
         // 将 API 中的 user_name 映射到数据库的 name
-        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: c.Value}, true
+        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: cmp.Value()}, true
     }
     return nil, false
 }
@@ -185,8 +186,8 @@ db.Model(&User{}).
 **示例：条件过滤**
 
 ```go
-filter := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
-    if c != nil && c.Column == "internal_field" {
+filter := func(e clause.Expression) (gormClause.Expression, bool) {
+    if cmp, ok := e.(clause.ComparisonExpression); ok && cmp.Column() == "internal_field" {
         // 过滤掉 internal_field 条件，返回 nil 表示不生成任何 GORM 表达式
         return nil, true
     }
@@ -324,9 +325,9 @@ q := query.Table("users").
     Offset(20)
 
 // 字段映射 converter
-columnMapper := func(e clause.Expression, c *clause.Condition) (gormClause.Expression, bool) {
-    if c != nil && c.Column == "user_name" {
-        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: c.Value}, true
+columnMapper := func(e clause.Expression) (gormClause.Expression, bool) {
+    if cmp, ok := e.(clause.ComparisonExpression); ok && cmp.Column() == "user_name" {
+        return gormClause.Eq{Column: gormClause.Column{Name: "name"}, Value: cmp.Value()}, true
     }
     return nil, false
 }

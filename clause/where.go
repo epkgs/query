@@ -22,6 +22,25 @@ const (
 	OpIN   Operator = "IN"
 )
 
+// LogicalOperator 表示逻辑运算符。
+type LogicalOperator int
+
+// 支持的逻辑运算符。
+const (
+	LogicAnd LogicalOperator = iota
+	LogicOr
+	LogicNot
+)
+
+// LogicalExpression 表示逻辑组合表达式。
+// AndExpr、OrExpr、NotExpr 等类型实现此接口。
+type LogicalExpression interface {
+	Expression
+	Operator() LogicalOperator
+	SubExprs() []Expression
+	logicalExpr() // 密封方法，仅 clause 包内实现
+}
+
 // Where where clause
 type Where struct {
 	Exprs []Expression
@@ -31,8 +50,8 @@ type Where struct {
 func (w Where) Build(builder Builder) {
 	exprs := w.Exprs
 	if len(exprs) == 1 {
-		if andExpr, ok := exprs[0].(AndExpr); ok {
-			exprs = andExpr.Exprs
+		if logical, ok := exprs[0].(LogicalExpression); ok && logical.Operator() == LogicAnd {
+			exprs = logical.SubExprs()
 		}
 	}
 	if len(exprs) > 0 {
@@ -51,113 +70,45 @@ func (w *Where) Merge(where Where) *Where {
 	return w
 }
 
-// Condition 是表达式的规范化结构表示，便于统一遍历与改写。
-type Condition struct {
-	Column string
-	Op     Operator
-	Values []any // 单值比较长度 1；IN 为多个；LIKE 为单个字符串
-}
-
-// AsCondition 将 Expression 转换成 Condition。逻辑组合等不支持的类型 ok=false。
-func AsCondition(expr Expression) (*Condition, bool) {
-	switch e := expr.(type) {
-	case Eq:
-		return &Condition{e.Column, OpEQ, []any{e.Value}}, true
-	case Neq:
-		return &Condition{e.Column, OpNEQ, []any{e.Value}}, true
-	case Gt:
-		return &Condition{e.Column, OpGT, []any{e.Value}}, true
-	case Gte:
-		return &Condition{e.Column, OpGTE, []any{e.Value}}, true
-	case Lt:
-		return &Condition{e.Column, OpLT, []any{e.Value}}, true
-	case Lte:
-		return &Condition{e.Column, OpLTE, []any{e.Value}}, true
-	case Like:
-		return &Condition{e.Column, OpLIKE, []any{e.Value}}, true
-	case IN:
-		return &Condition{e.Column, OpIN, e.Values}, true
-	}
-	return nil, false
-}
-
-func (c *Condition) ToExpr() Expression {
-
-	if c == nil {
-		return nil
-	}
-
-	if c.Column == "" {
-		return nil
-	}
-
-	switch c.Op {
-	case OpEQ:
-		return Eq{Column: c.Column, Value: c.Values[0]}
-	case OpNEQ:
-		return Neq{Column: c.Column, Value: c.Values[0]}
-	case OpGT:
-		return Gt{Column: c.Column, Value: c.Values[0]}
-	case OpGTE:
-		return Gte{Column: c.Column, Value: c.Values[0]}
-	case OpLT:
-		return Lt{Column: c.Column, Value: c.Values[0]}
-	case OpLTE:
-		return Lte{Column: c.Column, Value: c.Values[0]}
-	case OpLIKE:
-		return Like{Column: c.Column, Value: c.Values[0]}
-	case OpIN:
-		return IN{Column: c.Column, Values: c.Values}
-	}
-
-	return nil
-}
-
 // Map 遍历表达式列表，并生成新的表达式列表
 //
 // mapper 为表达式遍历函数，返回 nil 表示移除该表达式
 //   - e Expression 原表达式
-//   - c *Condition 解析出的 Condition 指针，当无法解析为 Condition 时，c 为 nil，如 And 等逻辑组合表达式
 //
 // 返回新的 Where 对象
-func (w Where) Map(mapper func(e Expression, c *Condition) Expression) Where {
+func (w Where) Map(mapper func(e Expression) Expression) Where {
 	exprs := mapExprs(w.Exprs, mapper)
 	return Where{Exprs: exprs}
 }
 
-func mapExprs(exprs []Expression, mapper func(e Expression, c *Condition) Expression) []Expression {
+func mapExprs(exprs []Expression, mapper func(e Expression) Expression) []Expression {
 	result := make([]Expression, 0, len(exprs))
 	for _, expr := range exprs {
-		c, ok := AsCondition(expr)
-		if !ok {
+		newExp := mapper(expr)
+		if newExp == nil {
+			continue
+		}
 
-			newExp := mapper(expr, nil)
-			if newExp == nil {
-				continue
-			}
-
-			switch e := newExp.(type) {
-			case AndExpr:
-				exprs := mapExprs(e.Exprs, mapper)
-				if expr := And(exprs...); expr != nil {
+		if logical, ok := newExp.(LogicalExpression); ok {
+			subExprs := mapExprs(logical.SubExprs(), mapper)
+			switch logical.Operator() {
+			case LogicAnd:
+				if expr := And(subExprs...); expr != nil {
 					result = append(result, expr)
 				}
-			case OrExpr:
-				exprs := mapExprs(e.Exprs, mapper)
-				if expr := Or(exprs...); expr != nil {
+			case LogicOr:
+				if expr := Or(subExprs...); expr != nil {
 					result = append(result, expr)
 				}
-			case NotExpr:
-				exprs := mapExprs(e.Exprs, mapper)
-				if expr := Not(exprs...); expr != nil {
+			case LogicNot:
+				if expr := Not(subExprs...); expr != nil {
 					result = append(result, expr)
 				}
 			}
 			continue
 		}
-		if e := mapper(expr, c); e != nil {
-			result = append(result, e)
-		}
+
+		result = append(result, newExp)
 	}
 	return result
 }
@@ -171,7 +122,7 @@ func And(exprs ...Expression) Expression {
 	}
 
 	if len(exprs) == 1 {
-		if _, ok := exprs[0].(OrExpr); !ok {
+		if logical, ok := exprs[0].(LogicalExpression); !ok || logical.Operator() != LogicOr {
 			return exprs[0]
 		}
 	}
@@ -194,6 +145,10 @@ func (and AndExpr) Build(builder Builder) {
 		buildExprs(and.Exprs, builder, " AND ")
 	}
 }
+
+func (and AndExpr) Operator() LogicalOperator { return LogicAnd }
+func (and AndExpr) SubExprs() []Expression    { return and.Exprs }
+func (and AndExpr) logicalExpr()              {}
 
 // Or 将多个表达式用 OR 逻辑组合。
 func Or(exprs ...Expression) Expression {
@@ -219,6 +174,10 @@ func (or OrExpr) Build(builder Builder) {
 	}
 }
 
+func (or OrExpr) Operator() LogicalOperator { return LogicOr }
+func (or OrExpr) SubExprs() []Expression    { return or.Exprs }
+func (or OrExpr) logicalExpr()              {}
+
 // Not 对表达式取反（NOT）。
 // 如果传入单个 AndExpr，会解开其内部的子表达式后取反。
 // 对于实现了 NegationExpressionBuilder 接口的表达式，
@@ -228,8 +187,8 @@ func Not(exprs ...Expression) Expression {
 		return nil
 	}
 	if len(exprs) == 1 {
-		if andCondition, ok := exprs[0].(AndExpr); ok {
-			exprs = andCondition.Exprs
+		if logical, ok := exprs[0].(LogicalExpression); ok && logical.Operator() == LogicAnd {
+			exprs = logical.SubExprs()
 		}
 	}
 	return NotExpr{Exprs: exprs}
@@ -240,6 +199,10 @@ func Not(exprs ...Expression) Expression {
 type NotExpr struct {
 	Exprs []Expression
 }
+
+func (not NotExpr) Operator() LogicalOperator { return LogicNot }
+func (not NotExpr) SubExprs() []Expression    { return not.Exprs }
+func (not NotExpr) logicalExpr()              {}
 
 func (not NotExpr) Build(builder Builder) {
 	anyNegationBuilder := false
@@ -278,10 +241,9 @@ func (not NotExpr) Build(builder Builder) {
 
 		for idx, c := range not.Exprs {
 			if idx > 0 {
-				switch c.(type) {
-				case OrExpr:
+				if logical, ok := c.(LogicalExpression); ok && logical.Operator() == LogicOr {
 					builder.WriteString(" OR ")
-				default:
+				} else {
 					builder.WriteString(" AND ")
 				}
 			}
@@ -299,7 +261,7 @@ func buildExprs(exprs []Expression, builder Builder, joinCond string) {
 
 	for idx, expr := range exprs {
 		if idx > 0 {
-			if v, ok := expr.(OrExpr); ok && len(v.Exprs) == 1 {
+			if logical, ok := expr.(LogicalExpression); ok && logical.Operator() == LogicOr && len(logical.SubExprs()) == 1 {
 				builder.WriteString(OrWithSpace)
 			} else {
 				builder.WriteString(joinCond)

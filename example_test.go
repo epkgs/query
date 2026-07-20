@@ -177,7 +177,7 @@ func Example_aipToEnt() {
 	// handler := func(expr clause.Expression) clause.Expression {
 	//     switch e := expr.(type) {
 	//     case clause.Eq:
-	//         e.Column = fieldMappings[e.Column]
+	//         e.Col = fieldMappings[e.Col]
 	//         return e
 	//     }
 	//     return expr

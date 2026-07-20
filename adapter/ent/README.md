@@ -189,14 +189,14 @@ handler := func(expr clause.Expression) clause.Expression {
     switch e := expr.(type) {
     case clause.Eq:
         // 将 API 中的 user_name 映射到数据库的 name
-        if e.Column == "user_name" {
-            e.Column = "name"
+        if e.Col == "user_name" {
+            e.Col = "name"
         }
         return e
     case clause.Gt:
         // 将 API 中的 user_age 映射到数据库的 age
-        if e.Column == "user_age" {
-            e.Column = "age"
+        if e.Col == "user_age" {
+            e.Col = "age"
         }
         return e
     }
@@ -215,7 +215,7 @@ handler := func(expr clause.Expression) clause.Expression {
     switch e := expr.(type) {
     case clause.Eq:
         // 过滤掉某些内部字段
-        if e.Column == "internal_field" {
+        if e.Col == "internal_field" {
             return nil
         }
     }
@@ -235,10 +235,10 @@ handler := func(expr clause.Expression) clause.Expression {
     switch e := expr.(type) {
     case clause.Eq:
         // 将等值查询转换为模糊查询
-        if e.Column == "search" {
+        if e.Col == "search" {
             return clause.Like{
-                Column: "name",
-                Value:  "%" + e.Value.(string) + "%",
+                Col: "name",
+                Val: "%" + e.Val.(string) + "%",
             }
         }
     }
@@ -416,8 +416,8 @@ exprHandler := func(expr clause.Expression) clause.Expression {
             "user_name": "name",
             "user_age":  "age",
         }
-        if dbField, ok := mapping[e.Column]; ok {
-            e.Column = dbField
+        if dbField, ok := mapping[e.Col]; ok {
+            e.Col = dbField
         }
         return e
     }
